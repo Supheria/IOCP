@@ -53,8 +53,12 @@ namespace Net
 
         public void Close()
         {
-            m_thread.Abort();
-            m_thread.Join();
+            //try
+            //{
+            //    m_thread.Abort();
+            //}
+            //catch { }
+            //m_thread.Join();
         }
     }
 }

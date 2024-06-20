@@ -360,7 +360,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
                     continue;
                 //lock (userToken) //AsyncSocketUserToken有多个线程访问
                 //    userToken.Close();
-                Server.CloseClientSocket(userToken);
+                IocpServer.CloseClientSocket(userToken);
                 result = false;
             }
             return result;
