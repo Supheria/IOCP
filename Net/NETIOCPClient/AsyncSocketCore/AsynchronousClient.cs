@@ -29,7 +29,7 @@ namespace NETIOCPClient.AsyncSocketCore
         {
             // Create a TCP/IP socket.  
             client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);            
-            m_recvBuffer = new DynamicBufferManager(ProtocolConst.ReceiveBufferSize);                     
+            m_recvBuffer = new DynamicBufferManager(ConstTabel.ReceiveBufferSize);                     
         }
         public bool Connect(string host,int port)
         {

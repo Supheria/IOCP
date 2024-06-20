@@ -7,7 +7,7 @@ namespace Net
     public static class ServerInstance
     {
         public static ILog Logger;
-        public static AsyncSocketServer AsyncSocketSvr;
+        public static IocpServer AsyncSocketSvr;
         public static string FileDirectory;
         public static AppHandler appHandler;
         /// <summary>
@@ -18,7 +18,7 @@ namespace Net
         /// <param name="MaxConnection">最大并发连接数</param>
         /// <param name="SocketTimeOutMS">超时（毫秒）</param>
         /// <param name="localIP">服务端用于侦听的IP，0.0.0.0表示服务端的所有IP</param>
-        public static void Init(string fileDirectory, int Port, int MaxConnection, int SocketTimeOutMS,string localIP)
+        public static void Init(string fileDirectory, int Port, int MaxConnection, int SocketTimeOutMS, string localIP)
         {
             DateTime currentTime = DateTime.Now;
             log4net.GlobalContext.Properties["LogDir"] = currentTime.ToString("yyyyMM");
@@ -34,11 +34,11 @@ namespace Net
             int port = Port;
             int parallelNum = MaxConnection;
             int socketTimeOutMS = SocketTimeOutMS;//1 * 60 * 1000
-            AsyncSocketSvr = new AsyncSocketServer(parallelNum);            
-            AsyncSocketSvr.SocketTimeOutMS = socketTimeOutMS;
-            AsyncSocketSvr.Init();
+            AsyncSocketSvr = new IocpServer(parallelNum, socketTimeOutMS);
+            //AsyncSocketSvr.TimeoutMilliseconds = socketTimeOutMS;
+            //AsyncSocketSvr.Init();
             IPEndPoint listenPoint = new IPEndPoint(IPAddress.Parse(localIP), port);
-            AsyncSocketSvr.Start(listenPoint);
+            AsyncSocketSvr.Start(port);
             //AsyncSocketSvr.SetNoDelay(true);//增强实时性时设为无延迟
         }
         public static void Close()
@@ -46,5 +46,5 @@ namespace Net
             if (AsyncSocketSvr != null)
                 AsyncSocketSvr.Close();
         }
-    }    
+    }
 }

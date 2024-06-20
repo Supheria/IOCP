@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using Net;
 
+// TODO: refine
 namespace Net
 {
     struct SendBufferPacket

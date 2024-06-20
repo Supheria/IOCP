@@ -2,7 +2,7 @@
 using System;
 using System.Windows.Forms;
 
-namespace ServerDemo
+namespace Net.ServerDemo
 {
     public partial class Server : Form
     {
@@ -29,7 +29,7 @@ namespace ServerDemo
             }
         }
 
-        void appHandler_OnReceivedMsg(string msg, FullHandlerSocketProtocol fullHandlerSocketProtocol)
+        void appHandler_OnReceivedMsg(string msg, ServerFullHandlerProtocol fullHandlerSocketProtocol)
         {
             if (msg.Contains(";"))
             {

@@ -1,11 +1,32 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
+    <OutputType>Library</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="NETIOCPCommon\log4net.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="log4net">
+      <HintPath>..\_lib\log4net.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="ClientDemo\Client.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="ServerDemo\Server.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="NETIOCPServer\AsyncSocketProtocolCore\" />
+  </ItemGroup>
 
 </Project>

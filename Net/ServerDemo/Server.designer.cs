@@ -1,4 +1,4 @@
-﻿namespace ServerDemo
+﻿namespace Net.ServerDemo
 {
     partial class Server
     {

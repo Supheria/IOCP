@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Net
 {
-    public class IncomingDataParser
+    public class CommandParser
     {
         private string m_header;
         public string Header { get { return m_header; } }
@@ -14,7 +14,7 @@ namespace Net
         private List<string> m_values;
         public List<string> Values { get { return m_values; } }
 
-        public IncomingDataParser()
+        public CommandParser()
         {
             m_names = new List<string>();
             m_values = new List<string>();

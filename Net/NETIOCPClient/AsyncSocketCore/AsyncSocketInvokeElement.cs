@@ -9,24 +9,24 @@ namespace NETIOCPClient.AsyncSocketCore
         protected AsynchronousClient m_tcpClient;
         protected string m_host;
         protected int m_port;
-        protected ProtocolFlag m_protocolFlag;
+        protected IocpProtocolTypes m_protocolFlag;
         protected int SocketTimeOutMS { get { return m_tcpClient.SendTimeout; } set { m_tcpClient.SendTimeout = value; m_tcpClient.ReceiveTimeout = value; } }
         private bool m_netByteOrder;        
         public bool NetByteOrder { get { return m_netByteOrder; } set { m_netByteOrder = value; } } //长度是否使用网络字节顺序
-        protected OutgoingDataAssembler m_outgoingDataAssembler; //协议组装器，用来组装往外发送的命令
+        protected CommandComposer m_outgoingDataAssembler; //协议组装器，用来组装往外发送的命令
         protected DynamicBufferManager m_recvBuffer; //接收数据的缓存
-        protected IncomingDataParser m_incomingDataParser; //收到数据的解析器，用于解析返回的内容
+        protected CommandParser m_incomingDataParser; //收到数据的解析器，用于解析返回的内容
         protected DynamicBufferManager m_sendBuffer; //发送数据的缓存，统一写到内存中，调用一次发送  
         
         public AsyncSocketInvokeElement()
         {
             m_tcpClient = new AsynchronousClient();            
-            m_protocolFlag = ProtocolFlag.None;
-            SocketTimeOutMS = ProtocolConst.SocketTimeOutMS;
-            m_outgoingDataAssembler = new OutgoingDataAssembler();
-            m_recvBuffer = new DynamicBufferManager(ProtocolConst.ReceiveBufferSize);
-            m_incomingDataParser = new IncomingDataParser();
-            m_sendBuffer = new DynamicBufferManager(ProtocolConst.ReceiveBufferSize);           
+            m_protocolFlag = IocpProtocolTypes.None;
+            SocketTimeOutMS = ConstTabel.SocketTimeOutMS;
+            m_outgoingDataAssembler = new CommandComposer();
+            m_recvBuffer = new DynamicBufferManager(ConstTabel.ReceiveBufferSize);
+            m_incomingDataParser = new CommandParser();
+            m_sendBuffer = new DynamicBufferManager(ConstTabel.ReceiveBufferSize);           
         }
         /// <summary>
         /// 设置SOCKET是否延迟发送

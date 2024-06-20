@@ -6,9 +6,9 @@ namespace Net
     /// </summary>
     public class AppHandler
     {
-        public delegate void HandlerReceivedMsg(string msg,FullHandlerSocketProtocol fullHandlerSocketProtocol);
+        public delegate void HandlerReceivedMsg(string msg,ServerFullHandlerProtocol fullHandlerSocketProtocol);
         public event HandlerReceivedMsg OnReceivedMsg;
-        public void HandlerMsg(string msg, FullHandlerSocketProtocol fullHandlerSocketProtocol)
+        public void HandlerMsg(string msg, ServerFullHandlerProtocol fullHandlerSocketProtocol)
         {
             if (OnReceivedMsg != null)
             {

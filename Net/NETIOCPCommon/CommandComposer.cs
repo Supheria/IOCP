@@ -3,11 +3,11 @@ using System.Collections.Generic;
 
 namespace Net
 {
-    public class OutgoingDataAssembler
+    public class CommandComposer
     {
         private List<string> m_protocolText;
 
-        public OutgoingDataAssembler()
+        public CommandComposer()
         {
             m_protocolText = new List<string>();
         }

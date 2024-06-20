@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Text;
 
+// TODO: refine
 namespace Net
 {
     public class DynamicBufferManager
@@ -13,6 +14,8 @@ namespace Net
             DataCount = 0;
             Buffer = new byte[bufferSize];
         }
+
+        public int BufferSize => Buffer.Length;
 
         public int GetDataCount() //获得当前写入的字节数
         {

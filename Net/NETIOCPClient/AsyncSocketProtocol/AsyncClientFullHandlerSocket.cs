@@ -84,7 +84,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
             : base()
         {
             logger = Logger;//继承自父对象
-            m_protocolFlag = ProtocolFlag.FullHandler;
+            m_protocolFlag = IocpProtocolTypes.FullHandler;
             m_fileName = "";
             m_fileStream = null;
             DE = de;
@@ -336,7 +336,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
                                             m_outgoingDataAssembler.Clear();
                                             m_outgoingDataAssembler.AddRequest();
                                             m_outgoingDataAssembler.AddCommand(ProtocolKey.SendFile);                                            
-                                            //m_outgoingDataAssembler.AddValue(ProtocolKey.FileSize, m_fileStream.Length);
+                                            //CommandComposer.AddValue(ProtocolKey.FileSize, FileStream.Length);
                                             SendCommand();                                            
                                         }                                        
                                     }
@@ -398,7 +398,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
                 m_outgoingDataAssembler.AddRequest();
                 m_outgoingDataAssembler.AddCommand(ProtocolKey.Login);
                 m_outgoingDataAssembler.AddValue(ProtocolKey.UserID, userID);
-                //m_outgoingDataAssembler.AddValue(ProtocolKey.Password, AsyncSocketServer.BasicFunc.MD5String(password));
+                //CommandComposer.AddValue(ProtocolKey.Password, IocpServer.BasicFunc.MD5String(password));
                 m_outgoingDataAssembler.AddValue(ProtocolKey.Password, password);
                 Password = password;
                 SendCommand();
