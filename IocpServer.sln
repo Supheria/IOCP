@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34714.143
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IocpServer", "IocpServer\IocpServer.csproj", "{58D9D60A-6FC0-4198-986C-37BA9D6FC7BD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{58D9D60A-6FC0-4198-986C-37BA9D6FC7BD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58D9D60A-6FC0-4198-986C-37BA9D6FC7BD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{58D9D60A-6FC0-4198-986C-37BA9D6FC7BD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{58D9D60A-6FC0-4198-986C-37BA9D6FC7BD}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F19392D5-2A1D-4902-AAF0-90B209D2D79B}
+	EndGlobalSection
+EndGlobal
