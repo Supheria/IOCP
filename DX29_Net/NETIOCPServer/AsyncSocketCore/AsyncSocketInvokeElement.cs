@@ -138,7 +138,7 @@ namespace Net
                 if (asyncSendBufferManager.GetFirstPacket(ref packetOffset, ref packetCount))
                 {
                     m_sendAsync = true;
-                    result = m_asyncSocketServer.SendAsyncEvent(m_asyncSocketUserToken.ConnectSocket, m_asyncSocketUserToken.SendEventArgs,
+                    result = m_asyncSocketServer.SendEvent(m_asyncSocketUserToken.ConnectSocket, m_asyncSocketUserToken.SendEventArgs,
                         asyncSendBufferManager.DynamicBufferManager.Buffer, packetOffset, packetCount);
                 }
             }

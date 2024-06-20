@@ -245,6 +245,14 @@ namespace Net
             }
         }
 
+        public bool SendEvent(Socket connectSocket, SocketAsyncEventArgs sendEventArgs, byte[] buffer, int offset, int count)
+        {
+            if (connectSocket == null)
+                return false;
+            connectSocket.Send(buffer);
+            return true;
+        }
+
         public bool SendAsyncEvent(Socket connectSocket, SocketAsyncEventArgs sendEventArgs, byte[] buffer, int offset, int count)
         {
             if (connectSocket == null)
