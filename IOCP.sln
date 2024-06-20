@@ -9,7 +9,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Net", "Net\Net.csproj", "{F
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LocalUtilities", "_lib\LocalUtilities\LocalUtilities.csproj", "{F66FC33B-1850-4506-9373-FB423CACD628}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IOCP_Net", "DX29_Net\IOCP_Net.csproj", "{97BD57FB-1B49-482C-8E62-899CAE576399}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Iocp_Net_raw", "DX29_Net\Iocp_Net_raw.csproj", "{97BD57FB-1B49-482C-8E62-899CAE576399}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientTest", "ClientTest\ClientTest.csproj", "{0BB4AE16-12A1-4716-A5B3-6233CD020C21}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{97BD57FB-1B49-482C-8E62-899CAE576399}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{97BD57FB-1B49-482C-8E62-899CAE576399}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{97BD57FB-1B49-482C-8E62-899CAE576399}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0BB4AE16-12A1-4716-A5B3-6233CD020C21}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0BB4AE16-12A1-4716-A5B3-6233CD020C21}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0BB4AE16-12A1-4716-A5B3-6233CD020C21}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0BB4AE16-12A1-4716-A5B3-6233CD020C21}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

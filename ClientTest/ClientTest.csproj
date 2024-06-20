@@ -10,9 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DX29_Net\Iocp_Net_raw.csproj" />
     <ProjectReference Include="..\Net\Net.csproj" />
-    <ProjectReference Include="..\_lib\LocalUtilities\LocalUtilities.csproj" />
   </ItemGroup>
 
 </Project>

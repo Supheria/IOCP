@@ -9,7 +9,7 @@ internal class ServerForm : ResizeableForm
 {
     public override string LocalName => nameof(ServerForm);
 
-    IocpServer Server { get; } = new(100, 1 * 60 * 1000);
+    IocpServer Server { get; } = new(2, 1 * 60 * 1000);
 
     Button SwitchButton { get; } = new()
     {
@@ -37,6 +37,12 @@ internal class ServerForm : ResizeableForm
         Server.OnClientNumberChange += Server_OnClientNumberChange;
         Server.OnReceiveMessage += Server_OnReceiveMessage;
         //Server.OnReceiveClientData += Server_ReceiveClientData;
+        Server.OnParalleRemainChange += Server_OnParalleRemainChange; 
+    }
+
+    private void Server_OnParalleRemainChange(int remain)
+    {
+        UpdateMessage($"paralle remain: {remain}");
     }
 
     private void Server_OnReceiveMessage(string message, ServerFullHandlerProtocol protocol)
