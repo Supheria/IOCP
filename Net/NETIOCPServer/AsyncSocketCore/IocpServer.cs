@@ -15,10 +15,6 @@ public class IocpServer
     int ParallelCountMax { get; }
 
     // TODO: remove this and use another way to limit paralle number
-    /// <summary>
-    /// 限制访问接收连接的线程数，用来控制最大并发数
-    /// </summary>
-    Semaphore ClientCountMax { get; }
 
     /// <summary>
     /// Socket最大超时时间，单位为毫秒
@@ -33,17 +29,20 @@ public class IocpServer
 
     private DaemonThread DaemonThread { get; }
 
+    /// <summary>
+    /// 所有新加入的服务端协议，必须在此处实例化
+    /// </summary>
+    public ServerFullHandlerProtocolManager ServerFullHandlerProtocolManager { get; } = [];
+
     public enum ClientState
     {
         Connect,
         Disconnect,
     }
 
-    public delegate void HandleMessage(string message, ServerFullHandlerProtocol protocol);
+    public delegate void HandleMessage(string message, ServerFullHandlerProtocol fullHandler);
 
     public delegate void ClientNumberChange(ClientState state, AsyncUserToken userToken);
-
-    public delegate void ReceiveClientData(AsyncUserToken userToken, byte[] data);
 
     public delegate void ParallelRemainChange(int remain);
 
@@ -51,24 +50,18 @@ public class IocpServer
 
     public event ClientNumberChange? OnClientNumberChange;
 
-    public event ReceiveClientData? OnReceiveClientData;
-
     public event ParallelRemainChange? OnParallelRemainChange;
 
     public IocpServer(int parallelCountMax, int timeoutMilliseconds)
     {
         ParallelCountMax = parallelCountMax;
-        //HACK: m_receiveBufferSize = ConstTabel.ReceiveBufferSize;
         UserTokenPool = new(parallelCountMax);
-        ClientCountMax = new(parallelCountMax, parallelCountMax);
-        //HACK: m_fullHandlerSocketProtocolMgr = new FullHandlerSocketProtocolMgr();//所有新加入的服务端协议，必须在此处实例化
         DaemonThread = new(ProcessDaemon);
         for (int i = 0; i < ParallelCountMax; i++) //按照连接数建立读写对象
         {
             var userToken = new AsyncUserToken(this);
             userToken.OnClosed += () =>
             {
-                //HACK: ClientCountMax.Release();
                 UserTokenPool.Push(userToken);
                 UserTokenList.Remove(userToken);
                 OnClientNumberChange?.Invoke(ClientState.Disconnect, userToken);
@@ -176,14 +169,10 @@ public class IocpServer
             return;
         }
         UserTokenList.Add(userToken);
-        //HACK: ClientCountMax.WaitOne(); //获取信号量
         OnParallelRemainChange?.Invoke(UserTokenPool.Count);
         try
         {
             userToken.ReceiveAsync();
-            //if (!userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs))
-            //    lock (userToken)
-            //        userToken.ProcessReceive();
             OnClientNumberChange?.Invoke(ClientState.Connect, userToken);
         }
         catch (Exception E)
@@ -195,8 +184,24 @@ public class IocpServer
             StartAccept(acceptArgs); //把当前异步事件释放，等待下次连接
     }
 
-    public void HandleReceiveMessage(string message, ServerFullHandlerProtocol protocol)
+    public void HandleReceiveMessage(string message, ServerFullHandlerProtocol fullHandler)
     {
-        OnReceiveMessage?.Invoke(message, protocol);
+        OnReceiveMessage?.Invoke(message, fullHandler);
+    }
+
+    public void AddProtocol(IocpServerProtocol? protocol)
+    {
+        if (protocol is not ServerFullHandlerProtocol fullHandler)
+            return;
+        lock(ServerFullHandlerProtocolManager)
+            ServerFullHandlerProtocolManager.Add(fullHandler);
+    }
+
+    public void RemoveProtocol(IocpServerProtocol? protocol)
+    {
+        if (protocol is not ServerFullHandlerProtocol fullHandler)
+            return;
+        lock (ServerFullHandlerProtocolManager)
+            ServerFullHandlerProtocolManager.Remove(fullHandler);
     }
 }

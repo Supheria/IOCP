@@ -10,12 +10,11 @@ public class AsyncUserToken
 {
     public IocpServer Server { get; }
 
-    public Socket? AcceptSocket { get; /*private*/ set; } = null;
+    Socket? AcceptSocket { get; set; } = null;
 
-    public SocketAsyncEventArgs ReceiveAsyncArgs { get; } = new();
+    SocketAsyncEventArgs ReceiveAsyncArgs { get; } = new();
 
-    //HACK: protected byte[] m_asyncReceiveBuffer;
-    public SocketAsyncEventArgs SendAsyncArgs { get; } = new();
+    SocketAsyncEventArgs SendAsyncArgs { get; } = new();
 
     public DynamicBufferManager ReceiveBuffer { get; } = new(ConstTabel.InitBufferSize);
 
@@ -24,7 +23,7 @@ public class AsyncUserToken
     /// <summary>
     /// 协议对象
     /// </summary>
-    public IocpServerProtocol? Protocol { get; /*private*/ set; } = null;
+    IocpServerProtocol? Protocol { get; set; } = null;
 
     public SocketInfo SocketInfo { get; } = new();
 
@@ -92,6 +91,7 @@ public class AsyncUserToken
         SendAsyncArgs.AcceptSocket = null;
         ReceiveBuffer.Clear(ReceiveBuffer.DataCount);
         SendBuffer.ClearPacket();
+        Server.RemoveProtocol(Protocol);
         Protocol?.Dispose();
         Protocol = null;
         SocketInfo.Disconnect();
@@ -152,6 +152,7 @@ public class AsyncUserToken
         {
             //ServerInstance.Logger.InfoFormat("Building socket invoke element {0}.Local Address: {1}, Remote Address: {2}",
             //    userToken.Protocol, userToken.AcceptSocket.LocalEndPoint, userToken.AcceptSocket.RemoteEndPoint);
+            Server.AddProtocol(Protocol);
             return true;
         }
         return false;

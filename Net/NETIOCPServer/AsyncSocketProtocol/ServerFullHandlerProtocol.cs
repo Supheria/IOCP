@@ -356,38 +356,22 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         if (isFileInUse())
         {
             bool result = true;
-            Server.UserTokenList.CopyTo(out var userTokens);
-            foreach (var userToken in userTokens)
+            lock (Server.ServerFullHandlerProtocolManager)
             {
-                if (userToken.Protocol is not ServerFullHandlerProtocol fullHandler)
-                    continue;
-                if (!filePath.Equals(fullHandler.FilePath, StringComparison.CurrentCultureIgnoreCase))
-                    continue;
-                //lock (userToken) //AsyncSocketUserToken有多个线程访问
-                userToken.Close();
-                result = false;
+                foreach(var fullHandler in Server.ServerFullHandlerProtocolManager)
+                {
+                    if (!filePath.Equals(fullHandler.FilePath, StringComparison.CurrentCultureIgnoreCase))
+                        continue;
+                    lock (fullHandler.UserToken) //AsyncSocketUserToken有多个线程访问
+                    {
+                        fullHandler.UserToken.Close();
+                    }
+                    result = false;
+                }
             }
             return result;
-            //lock (Server.FullHandlerSocketProtocolMgr)
-            //{
-            //    ServerFullHandlerProtocol fullHandlerSocketProtocol = null;
-            //    for (int i = 0; i < Server.FullHandlerSocketProtocolMgr.Count(); i++)
-            //    {
-            //        fullHandlerSocketProtocol = Server.FullHandlerSocketProtocolMgr.ElementAt(i);
-            //        if (filePath.Equals(fullHandlerSocketProtocol.FilePath, StringComparison.CurrentCultureIgnoreCase))
-            //        {
-            //            lock (fullHandlerSocketProtocol.UserToken) //AsyncSocketUserToken有多个线程访问
-            //            {
-            //                Server.CloseClientSocket(fullHandlerSocketProtocol.UserToken);
-            //            }
-            //            result = false;
-            //        }
-            //    }
-            //}
-            //return result;
         }
-        else
-            return false;
+        return false;
         bool isFileInUse()
         {
             try
@@ -402,6 +386,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
             }
         }
     }
+
     public override bool SendCallback()
     {
         bool result = base.SendCallback();
@@ -444,45 +429,5 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
             }
         }
         return result;
-    }
-}
-public class FullHandlerSocketProtocolMgr : Object
-{
-    private List<ServerFullHandlerProtocol> m_list;
-
-    public FullHandlerSocketProtocolMgr()
-    {
-        m_list = new List<ServerFullHandlerProtocol>();
-    }
-
-    public int Count()
-    {
-        return m_list.Count;
-    }
-
-    public ServerFullHandlerProtocol ElementAt(int index)
-    {
-        return m_list.ElementAt(index);
-    }
-
-    public void Add(ServerFullHandlerProtocol value)
-    {
-        m_list.Add(value);
-    }
-
-    public void Remove(ServerFullHandlerProtocol value)
-    {
-        m_list.Remove(value);
-    }
-    /// <summary>
-    /// 向在线的客户端广播
-    /// </summary>
-    /// <param name="msg">广播信息</param>
-    public void Broadcast(string msg)
-    {
-        foreach (var item in m_list)
-        {
-            ((ServerFullHandlerProtocol)item).SendMessage(msg);
-        }
     }
 }
