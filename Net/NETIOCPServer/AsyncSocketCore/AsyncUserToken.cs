@@ -125,4 +125,73 @@ public class AsyncUserToken
         OnClosed?.Invoke();
         return true;
     }
+
+
+
+
+    public void ReceiveAsync()
+    {
+        if (AcceptSocket is not null && !AcceptSocket.ReceiveAsync(ReceiveAsyncArgs))
+            ProcessReceive(ReceiveAsyncArgs);
+    }
+
+    //public void ProcessReceive()
+    //{
+    //    ProcessReceive(ReceiveAsyncArgs);
+    //}
+
+    public static void ProcessReceive(SocketAsyncEventArgs receiveArgs)
+    {
+        if (receiveArgs.UserToken is not AsyncUserToken userToken)
+            return;
+        if (userToken.AcceptSocket is null)
+            return;
+        if (userToken.ReceiveAsyncArgs.Buffer is null || userToken.ReceiveAsyncArgs.BytesTransferred <= 0 || userToken.ReceiveAsyncArgs.SocketError is not SocketError.Success)
+            goto CLOSE;
+        userToken.SocketInfo.Active();
+        if (!userToken.BuildProtocol())
+            goto CLOSE;
+        var offset = userToken.ReceiveAsyncArgs.Offset + 1;
+        var count = userToken.ReceiveAsyncArgs.BytesTransferred - 1;
+        // 处理接收数据
+        if (count > 0 && !userToken.Protocol.ProcessReceive(userToken.ReceiveAsyncArgs.Buffer, offset, count))
+            goto CLOSE;
+        userToken.ReceiveAsync();
+        return;
+    CLOSE:
+        userToken.Close();
+    }
+
+    public bool BuildProtocol()
+    {
+        if (AcceptSocket is null || ReceiveAsyncArgs.Buffer is null)
+            return false;
+        var protocolType = (IocpProtocolTypes)ReceiveAsyncArgs.Buffer[ReceiveAsyncArgs.Offset];
+        Protocol = protocolType switch
+        {
+            IocpProtocolTypes.FullHandler => new ServerFullHandlerProtocol(Server, this),
+            _ => null
+        };
+        if (Protocol is not null)
+        {
+            //ServerInstance.Logger.InfoFormat("Building socket invoke element {0}.Local Address: {1}, Remote Address: {2}",
+            //    userToken.Protocol, userToken.AcceptSocket.LocalEndPoint, userToken.AcceptSocket.RemoteEndPoint);
+            return true;
+        }
+        return false;
+    }
+
+    private void ProcessSend(SocketAsyncEventArgs sendArgs)
+    {
+        if (sendArgs.UserToken is not AsyncUserToken userToken)
+            return;
+        if (userToken.Protocol is null)
+            return;
+        SocketInfo.Active();
+        // 调用子类回调函数
+        //if (sendArgs.SocketError is SocketError.Success)
+        //    userToken.Protocol.ProcessSend();
+        //else
+        //    userToken.Close();
+    }
 }

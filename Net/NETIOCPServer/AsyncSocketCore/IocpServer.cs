@@ -199,56 +199,62 @@ public class IocpServer
         OnReceiveMessage?.Invoke(message, protocol);
     }
 
-    private void ProcessReceive(SocketAsyncEventArgs receiveEventArgs)
+    private void ProcessReceive(SocketAsyncEventArgs receiveArgs)
     {
-        AsyncUserToken userToken = receiveEventArgs.UserToken as AsyncUserToken;
-        if (userToken.AcceptSocket == null)
+        if (receiveArgs.UserToken is not AsyncUserToken userToken)
             return;
-        //userToken.ActiveDateTime = DateTime.Now;
-        if (userToken.ReceiveAsyncArgs.BytesTransferred > 0 && userToken.ReceiveAsyncArgs.SocketError == SocketError.Success)
+        if (userToken.AcceptSocket is null)
+            return;
+        if (userToken.ReceiveAsyncArgs.BytesTransferred <= 0 || userToken.ReceiveAsyncArgs.SocketError is not SocketError.Success)
+            goto CLOSE;
+        var offset = userToken.ReceiveAsyncArgs.Offset;
+        var count = userToken.ReceiveAsyncArgs.BytesTransferred;
+        if (userToken.Protocol is null)
         {
-            int offset = userToken.ReceiveAsyncArgs.Offset;
-            int count = userToken.ReceiveAsyncArgs.BytesTransferred;
-            if ((userToken.Protocol == null) & (userToken.AcceptSocket != null)) //存在Socket对象，并且没有绑定协议对象，则进行协议对象绑定
+            if (userToken.BuildProtocol())
             {
-                BuildingSocketInvokeElement(userToken);
-                offset = offset + 1;
-                count = count - 1;
-            }
-            if (userToken.Protocol == null) //如果没有解析对象，提示非法连接并关闭连接
-            {
-                //ServerInstance.Logger.WarnFormat("Illegal client connection. Local Address: {0}, Remote Address: {1}", userToken.AcceptSocket.LocalEndPoint,
-                //userToken.AcceptSocket.RemoteEndPoint);
-                userToken.Close();
+                offset++;
+                count--;
             }
             else
-            {
-                if (count > 0) //处理接收数据
-                {
-                    if (!userToken.Protocol.ProcessReceive(userToken.ReceiveAsyncArgs.Buffer, offset, count))
-                    { //如果处理数据返回失败，则断开连接
-                        userToken.Close();
-                    }
-                    else //否则投递下次接收数据请求
-                    {
-                        bool willRaiseEvent = userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs); //投递接收请求
-                        if (!willRaiseEvent)
-                            ProcessReceive(userToken.ReceiveAsyncArgs);
-                    }
-                }
-                else
-                {
-                    bool willRaiseEvent = userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs); //投递接收请求
-                    if (!willRaiseEvent)
-                        ProcessReceive(userToken.ReceiveAsyncArgs);
-                }
-            }
+                goto CLOSE;
         }
-        else
-        {
-            userToken.Close(); //接收数据长度为0或者SocketError 不等于 SocketError.Success表示socket已经断开，所以服务端执行断开清理工作
-        }
+        //userToken.ActiveDateTime = DateTime.Now;
+        if (count > 0 && !userToken.Protocol.ProcessReceive(userToken.ReceiveAsyncArgs.Buffer, offset, count))
+            goto CLOSE;
+        if (!userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs))
+            ProcessReceive(userToken.ReceiveAsyncArgs);
+        return;
+    CLOSE:
+        // 接收数据长度为0或者SocketError 不等于 SocketError.Success表示socket已经断开，所以服务端执行断开清理工作
+        userToken.Close();
     }
+
+
+
+    //private void ProcessReceive(SocketAsyncEventArgs receiveArgs)
+    //{
+    //    if (receiveArgs.UserToken is not AsyncUserToken userToken)
+    //        return;
+    //    if (userToken.AcceptSocket is null)
+    //        return;
+    //    if (userToken.ReceiveAsyncArgs.Buffer is null || userToken.ReceiveAsyncArgs.BytesTransferred <= 0 || userToken.ReceiveAsyncArgs.SocketError is not SocketError.Success)
+    //        goto CLOSE;
+    //    if (!userToken.BuildProtocol())
+    //        goto CLOSE;
+    //    //userToken.ActiveDateTime = DateTime.Now;
+    //    var offset = userToken.ReceiveAsyncArgs.Offset + 1;
+    //    var count = userToken.ReceiveAsyncArgs.BytesTransferred - 1;
+    //    if (count > 0 && !userToken.Protocol.ProcessReceive(userToken.ReceiveAsyncArgs.Buffer, offset, count))
+    //        goto CLOSE;
+    //    if (!userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs))
+    //        ProcessReceive(userToken.ReceiveAsyncArgs);
+    //    return;
+    //CLOSE:
+    //    // 接收数据长度为0或者SocketError 不等于 SocketError.Success表示socket已经断开，所以服务端执行断开清理工作
+    //    userToken.Close();
+
+    //}
 
     private void BuildingSocketInvokeElement(AsyncUserToken userToken)
     {
