@@ -32,42 +32,16 @@ public class AsyncUserToken
 
     public event AsyncUserTokenEvent? OnClosed;
 
-    Action<SocketAsyncEventArgs> ProcessSendOperation { get; }
-
     object Locker { get; } = new();
 
-    public AsyncUserToken(IocpServer server, Action<SocketAsyncEventArgs> processSendOperation)
+    public AsyncUserToken(IocpServer server)
     {
         Server = server;
         ReceiveAsyncArgs.UserToken = this;
         SendAsyncArgs.UserToken = this;
         ReceiveAsyncArgs.SetBuffer(new byte[ReceiveBuffer.BufferSize], 0, ReceiveBuffer.BufferSize);
-        ProcessSendOperation = processSendOperation;
-        ReceiveAsyncArgs.Completed += CompleteIO;
-        SendAsyncArgs.Completed += CompleteIO;
-    }
-
-    void CompleteIO(object? sender, SocketAsyncEventArgs asyncEventArgs)
-    {
-        AsyncUserToken userToken = asyncEventArgs.UserToken as AsyncUserToken;
-        //userToken.ActiveDateTime = DateTime.Now;
-        try
-        {
-            lock (userToken)
-            {
-                if (asyncEventArgs.LastOperation == SocketAsyncOperation.Receive)
-                    ProcessReceive();
-                else if (asyncEventArgs.LastOperation == SocketAsyncOperation.Send)
-                    ProcessSendOperation(asyncEventArgs);
-                else
-                    throw new ArgumentException("The last operation completed on the socket was not a receive or send");
-            }
-        }
-        catch (Exception E)
-        {
-            //ServerInstance.Logger.ErrorFormat("CompleteIO {0} error, message: {1}", userToken.AcceptSocket, E.Message);
-            //ServerInstance.Logger.Error(E.StackTrace);
-        }
+        ReceiveAsyncArgs.Completed += (_, _) => ProcessReceive();
+        SendAsyncArgs.Completed += (_, _) => ProcessSend();
     }
 
     [MemberNotNullWhen(true, nameof(AcceptSocket))]
@@ -125,9 +99,6 @@ public class AsyncUserToken
         return true;
     }
 
-
-
-
     public void ReceiveAsync()
     {
         if (AcceptSocket is not null && !AcceptSocket.ReceiveAsync(ReceiveAsyncArgs))
@@ -136,11 +107,6 @@ public class AsyncUserToken
                 ProcessReceive();
         }
     }
-
-    //public void ProcessReceive()
-    //{
-    //    ProcessReceive(ReceiveAsyncArgs);
-    //}
 
     public void ProcessReceive()
     {
@@ -160,7 +126,7 @@ public class AsyncUserToken
             else
                 goto CLOSE;
         }
-        //userToken.ActiveDateTime = DateTime.Now;
+        SocketInfo.Active();
         if (count > 0 && !Protocol.ProcessReceive(ReceiveAsyncArgs.Buffer, offset, count))
             goto CLOSE;
         if (!AcceptSocket.ReceiveAsync(ReceiveAsyncArgs))
@@ -191,17 +157,24 @@ public class AsyncUserToken
         return false;
     }
 
-    private void ProcessSend(SocketAsyncEventArgs sendArgs)
+    public void SendAsync(byte[] buffer, int offset, int count)
     {
-        if (sendArgs.UserToken is not AsyncUserToken userToken)
+        if (AcceptSocket is null)
             return;
-        if (userToken.Protocol is null)
+        SendAsyncArgs.SetBuffer(buffer, offset, count);
+        if (!AcceptSocket.SendAsync(SendAsyncArgs))
+            new Task(() => ProcessSend()).Start();
+    }
+
+    public void ProcessSend()
+    {
+        if (Protocol is null)
             return;
         SocketInfo.Active();
         // 调用子类回调函数
-        //if (sendArgs.SocketError is SocketError.Success)
-        //    userToken.Protocol.ProcessSend();
-        //else
-        //    userToken.Close();
+        if (SendAsyncArgs.SocketError is SocketError.Success)
+            Protocol.ProcessSend();
+        else
+            Close();
     }
 }

@@ -65,7 +65,7 @@ public class IocpServer
         DaemonThread = new(ProcessDaemon);
         for (int i = 0; i < ParallelCountMax; i++) //按照连接数建立读写对象
         {
-            var userToken = new AsyncUserToken(this, ProcessSend);
+            var userToken = new AsyncUserToken(this);
             userToken.OnClosed += () =>
             {
                 //HACK: ClientCountMax.Release();
@@ -198,30 +198,5 @@ public class IocpServer
     public void HandleReceiveMessage(string message, ServerFullHandlerProtocol protocol)
     {
         OnReceiveMessage?.Invoke(message, protocol);
-    }
-
-
-    private void ProcessSend(SocketAsyncEventArgs sendEventArgs)
-    {
-        AsyncUserToken userToken = sendEventArgs.UserToken as AsyncUserToken;
-        if (userToken.Protocol == null)
-            return;
-        //userToken.ActiveDateTime = DateTime.Now;
-        if (sendEventArgs.SocketError == SocketError.Success)
-            userToken.Protocol.SendCompleted(); //调用子类回调函数
-        else
-        {
-            userToken.Close();
-        }
-    }
-
-    public bool SendAsyncEvent(Socket connectSocket, SocketAsyncEventArgs sendEventArgs, byte[] buffer, int offset, int count)
-    {
-        if (connectSocket == null)
-            return false;
-        sendEventArgs.SetBuffer(buffer, offset, count);
-        if (!connectSocket.SendAsync(sendEventArgs))
-            new Task(() => ProcessSend(sendEventArgs)).Start();
-        return true;
     }
 }

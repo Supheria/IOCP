@@ -100,7 +100,7 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
         return true;
     }
 
-    public virtual bool SendCompleted()
+    public virtual void ProcessSend()
     {
         ActiveTime = DateTime.UtcNow;
         IsSendingAsync = false;
@@ -111,11 +111,10 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
         if (asyncSendBufferManager.GetFirstPacket(ref offset, ref count))
         {
             IsSendingAsync = true;
-            return Server.SendAsyncEvent(UserToken.AcceptSocket, UserToken.SendAsyncArgs,
-                asyncSendBufferManager.DynamicBufferManager.Buffer, offset, count);
+            UserToken.SendAsync(asyncSendBufferManager.DynamicBufferManager.Buffer, offset, count);
         }
         else
-            return SendCallback();
+            SendCallback();
     }
 
     //发送回调函数，用于连续下发数据
@@ -144,8 +143,7 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
             if (asyncSendBufferManager.GetFirstPacket(ref packetOffset, ref packetCount))
             {
                 IsSendingAsync = true;
-                result = Server.SendAsyncEvent(UserToken.AcceptSocket, UserToken.SendAsyncArgs,
-                    asyncSendBufferManager.DynamicBufferManager.Buffer, packetOffset, packetCount);
+                UserToken.SendAsync(asyncSendBufferManager.DynamicBufferManager.Buffer, packetOffset, packetCount);
             }
         }
         return result;
@@ -171,8 +169,7 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
             if (asyncSendBufferManager.GetFirstPacket(ref packetOffset, ref packetCount))
             {
                 IsSendingAsync = true;
-                result = Server.SendAsyncEvent(UserToken.AcceptSocket, UserToken.SendAsyncArgs,
-                    asyncSendBufferManager.DynamicBufferManager.Buffer, packetOffset, packetCount);
+                UserToken.SendAsync(asyncSendBufferManager.DynamicBufferManager.Buffer, packetOffset, packetCount);
             }
         }
         return result;
@@ -193,8 +190,7 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
             if (asyncSendBufferManager.GetFirstPacket(ref packetOffset, ref packetCount))
             {
                 IsSendingAsync = true;
-                result = Server.SendAsyncEvent(UserToken.AcceptSocket, UserToken.SendAsyncArgs,
-                    asyncSendBufferManager.DynamicBufferManager.Buffer, packetOffset, packetCount);
+                UserToken.SendAsync(asyncSendBufferManager.DynamicBufferManager.Buffer, packetOffset, packetCount);
             }
         }
         return result;
