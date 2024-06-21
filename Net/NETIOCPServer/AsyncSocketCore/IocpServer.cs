@@ -17,8 +17,6 @@ public class IocpServer
     /// </summary>
     int ParalleCountMax { get; }
 
-    //private int m_receiveBufferSize; //每个连接接收缓存大小
-
     // TODO: remove this and use another way to limit paralle number
     /// <summary>
     /// 限制访问接收连接的线程数，用来控制最大并发数
@@ -35,9 +33,6 @@ public class IocpServer
 
 
     public AsyncUserTokenList UserTokenList { get; } = [];
-
-    //HACK: private FullHandlerSocketProtocolMgr m_fullHandlerSocketProtocolMgr;
-    //HACK: public FullHandlerSocketProtocolMgr FullHandlerSocketProtocolMgr { get { return m_fullHandlerSocketProtocolMgr; } }
 
     private DaemonThread DaemonThread { get; }
 
@@ -76,7 +71,7 @@ public class IocpServer
             var userToken = new AsyncUserToken(this, ProcessReceive, ProcessSend);
             userToken.OnClosed += () =>
             {
-                ClientCountMax.Release();
+                //HACK: ClientCountMax.Release();
                 UserTokenPool.Push(userToken);
                 UserTokenList.Remove(userToken);
                 OnClientNumberChange?.Invoke(ClientState.Disconnect, userToken);
@@ -100,8 +95,7 @@ public class IocpServer
                 if ((DateTime.Now - userToken.SocketInfo.ActiveTime).Milliseconds > TimeoutMilliseconds) //超时Socket断开
                 {
                     lock (userToken)
-                        //userToken.Close();
-                        CloseClientSocket(userToken);
+                        userToken.Close();
                 }
             }
             catch (Exception ex)
@@ -112,18 +106,6 @@ public class IocpServer
         }
     }
 
-    // HACK: remove
-    //public void Init()
-    //{
-    //    AsyncUserToken userToken;
-    //    for (int i = 0; i < ParalleCountMax; i++) //按照连接数建立读写对象
-    //    {
-    //        userToken = new AsyncSocketUserToken(m_receiveBufferSize);
-    //        userToken.ReceiveAsyncArgs.Completed += new EventHandler<SocketAsyncEventArgs>(CompleteIO);//每一个连接会话绑定一个接收完成事件
-    //        userToken.SendAsyncArgs.Completed += new EventHandler<SocketAsyncEventArgs>(CompleteIO);//每一个连接会话绑定一个发送完成事件
-    //        UserTokenPool.Push(userToken);
-    //    }
-    //}
     /// <summary>
     /// 设置服务端SOCKET是否延迟，如果保证实时性，请设为true,默认为false
     /// </summary>
@@ -162,8 +144,7 @@ public class IocpServer
         }
         UserTokenList.CopyTo(out var userTokens);
         foreach (var userToken in userTokens)//双向关闭已存在的连接
-            //userToken.Close();
-            CloseClientSocket(userToken);
+            userToken.Close();
         UserTokenList.Clear();
         Core?.Close();
         DaemonThread.Stop();
@@ -176,15 +157,12 @@ public class IocpServer
         if (acceptEventArgs == null)
         {
             acceptEventArgs = new SocketAsyncEventArgs();
-            //acceptArgs.Completed += new EventHandler<SocketAsyncEventArgs>(AcceptEventArg_Completed);
             acceptEventArgs.Completed += (sender, acceptArgs) => ProcessAccept(acceptArgs);
         }
         else
         {
             acceptEventArgs.AcceptSocket = null; //释放上次绑定的Socket，等待下一个Socket连接
         }
-
-        //ClientCountMax.WaitOne(); //获取信号量
         bool willRaiseEvent = Core.AcceptAsync(acceptEventArgs);
         if (!willRaiseEvent)
         {
@@ -192,23 +170,8 @@ public class IocpServer
         }
     }
 
-    //void AcceptEventArg_Completed(object sender, SocketAsyncEventArgs acceptArgs)
-    //{
-    //    try
-    //    {
-    //        ProcessAccept(acceptArgs);
-    //    }
-    //    catch (Exception E)
-    //    {
-    //        //ServerInstance.Logger.ErrorFormat("Accept client {0} error, message: {1}", acceptArgs.AcceptSocket, E.Message);
-    //        //ServerInstance.Logger.Error(E.StackTrace);
-    //    }
-    //}
-
     private void ProcessAccept(SocketAsyncEventArgs acceptArgs)
     {
-        //ServerInstance.Logger.InfoFormat("Client connection accepted. Local Address: {0}, Remote Address: {1}",
-        //    acceptArgs.AcceptSocket.LocalEndPoint, acceptArgs.AcceptSocket.RemoteEndPoint);
         var userToken = UserTokenPool.Pop();
         if (!userToken.ProcessAccept(acceptArgs.AcceptSocket))
         {
@@ -216,27 +179,14 @@ public class IocpServer
             return;
         }
         UserTokenList.Add(userToken);
-        ClientCountMax.WaitOne(); //获取信号量
+        //HACK: ClientCountMax.WaitOne(); //获取信号量
         OnParalleRemainChange?.Invoke(UserTokenPool.Count);
-        //AsyncUserToken userToken = UserTokenPool.Pop();            
-        //UserTokenList.Add(userToken); //添加到正在连接列表
-        //userToken.AcceptSocket = acceptArgs.AcceptSocket;
-        //userToken.AcceptSocket.IOControl(IOControlCode.KeepAliveValues, keepAlive(1, 1000 * 10 , 1000 * 10), null);//设置TCP Keep-alive数据包的发送间隔为10秒
-        ////userToken.ConnectDateTime = DateTime.Now;
         try
         {
             if (!userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs))
                 lock (userToken)
                     ProcessReceive(userToken.ReceiveAsyncArgs);
             OnClientNumberChange?.Invoke(ClientState.Connect, userToken);
-            //bool willRaiseEvent = userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs); //投递接收请求
-            //if (!willRaiseEvent)
-            //{
-            //    lock (userToken)
-            //    {
-            //        ProcessReceive(userToken.ReceiveAsyncArgs);
-            //    }
-            //}
         }
         catch (Exception E)
         {
@@ -272,7 +222,7 @@ public class IocpServer
             {
                 //ServerInstance.Logger.WarnFormat("Illegal client connection. Local Address: {0}, Remote Address: {1}", userToken.AcceptSocket.LocalEndPoint,
                 //userToken.AcceptSocket.RemoteEndPoint);
-                CloseClientSocket(userToken);
+                userToken.Close();
             }
             else
             {
@@ -280,7 +230,7 @@ public class IocpServer
                 {
                     if (!userToken.Protocol.ProcessReceive(userToken.ReceiveAsyncArgs.Buffer, offset, count))
                     { //如果处理数据返回失败，则断开连接
-                        CloseClientSocket(userToken);
+                        userToken.Close();
                     }
                     else //否则投递下次接收数据请求
                     {
@@ -299,7 +249,7 @@ public class IocpServer
         }
         else
         {
-            CloseClientSocket(userToken); //接收数据长度为0或者SocketError 不等于 SocketError.Success表示socket已经断开，所以服务端执行断开清理工作
+            userToken.Close(); //接收数据长度为0或者SocketError 不等于 SocketError.Success表示socket已经断开，所以服务端执行断开清理工作
         }
     }
 
@@ -325,7 +275,7 @@ public class IocpServer
             userToken.Protocol.SendCompleted(); //调用子类回调函数
         else
         {
-            CloseClientSocket(userToken);
+            userToken.Close();
         }
     }
 
@@ -334,55 +284,8 @@ public class IocpServer
         if (connectSocket == null)
             return false;
         sendEventArgs.SetBuffer(buffer, offset, count);
-        bool willRaiseEvent = connectSocket.SendAsync(sendEventArgs);
-        if (!willRaiseEvent)
-        {
-            //return ProcessSend(sendEventArgs);
-            //connectSocket.BeginSend(buffer, offset, count, SocketFlags.None, (r) =>
-            //{
-            //    var socket = r.AsyncState as Socket;
-            //    socket?.EndSend(r);
-            //}, connectSocket);
+        if (!connectSocket.SendAsync(sendEventArgs))
             new Task(() => ProcessSend(sendEventArgs)).Start();
-            return true;
-        }
-        else
-            return true;
-    }
-
-    public static void CloseClientSocket(AsyncUserToken userToken)
-    {
-        //if (userToken.AcceptSocket == null)
-        //    return;
-        //string socketInfo = string.Format("Local Address: {0} Remote Address: {1}", userToken.AcceptSocket.LocalEndPoint,
-        //    userToken.AcceptSocket.RemoteEndPoint);
-        //ServerInstance.Logger.InfoFormat("Client connection disconnected. {0}", socketInfo);
-        //try
-        //{
-        //    userToken.AcceptSocket.Shutdown(SocketShutdown.Both);
-        //}
-        //catch (Exception E)
-        //{
-        //    //ServerInstance.Logger.ErrorFormat("CloseClientSocket Disconnect client {0} error, message: {1}", socketInfo, E.Message);
-        //}
-        userToken.Close();
-        //userToken.AcceptSocket.Close();
-        //userToken.AcceptSocket = null; //释放引用，并清理缓存，包括释放协议对象等资源
-
-        //ClientCountMax.Release();
-        //UserTokenPool.Push(userToken);
-        //UserTokenList.Remove(userToken);
-        //OnClientNumberChange?.Invoke(ClientState.Disconnect, userToken);
-    }
-    public void Close()
-    {
-        UserTokenList.CopyTo(out var userTokens);
-        foreach(var userToken in userTokens)//双向关闭已存在的连接
-        {
-            CloseClientSocket(userToken);
-        }
-        Core.Close();
-        DaemonThread.Stop();
-        //ServerInstance.Logger.Info("Server is Stoped");
+        return true;
     }
 }

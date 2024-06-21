@@ -359,8 +359,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
                 if (!filePath.Equals(fullHandler.FilePath, StringComparison.CurrentCultureIgnoreCase))
                     continue;
                 //lock (userToken) //AsyncSocketUserToken有多个线程访问
-                //    userToken.Close();
-                IocpServer.CloseClientSocket(userToken);
+                userToken.Close();
                 result = false;
             }
             return result;

@@ -9,7 +9,7 @@ internal class ServerForm : ResizeableForm
 {
     public override string LocalName => nameof(ServerForm);
 
-    IocpServer Server { get; } = new(2, 1 * 60 * 1000);
+    IocpServer Server { get; } = new(100, 1 * 60 * 1000);
 
     Button SwitchButton { get; } = new()
     {

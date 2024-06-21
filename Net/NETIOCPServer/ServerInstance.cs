@@ -44,7 +44,7 @@ namespace Net
         public static void Close()
         {
             if (AsyncSocketSvr != null)
-                AsyncSocketSvr.Close();
+                AsyncSocketSvr.Stop();
         }
     }
 }
