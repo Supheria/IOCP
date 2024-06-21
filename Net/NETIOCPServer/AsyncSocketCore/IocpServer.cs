@@ -73,9 +73,7 @@ public class IocpServer
         DaemonThread = new(ProcessDaemon);
         for (int i = 0; i < ParalleCountMax; i++) //按照连接数建立读写对象
         {
-            var userToken = new AsyncUserToken(this);
-            userToken.ReceiveAsyncArgs.Completed += new EventHandler<SocketAsyncEventArgs>(IO_Completed);//每一个连接会话绑定一个接收完成事件
-            userToken.SendAsyncArgs.Completed += new EventHandler<SocketAsyncEventArgs>(IO_Completed);//每一个连接会话绑定一个发送完成事件
+            var userToken = new AsyncUserToken(this, ProcessReceive, ProcessSend);
             userToken.OnClosed += () =>
             {
                 ClientCountMax.Release();
@@ -121,8 +119,8 @@ public class IocpServer
     //    for (int i = 0; i < ParalleCountMax; i++) //按照连接数建立读写对象
     //    {
     //        userToken = new AsyncSocketUserToken(m_receiveBufferSize);
-    //        userToken.ReceiveAsyncArgs.Completed += new EventHandler<SocketAsyncEventArgs>(IO_Completed);//每一个连接会话绑定一个接收完成事件
-    //        userToken.SendAsyncArgs.Completed += new EventHandler<SocketAsyncEventArgs>(IO_Completed);//每一个连接会话绑定一个发送完成事件
+    //        userToken.ReceiveAsyncArgs.Completed += new EventHandler<SocketAsyncEventArgs>(CompleteIO);//每一个连接会话绑定一个接收完成事件
+    //        userToken.SendAsyncArgs.Completed += new EventHandler<SocketAsyncEventArgs>(CompleteIO);//每一个连接会话绑定一个发送完成事件
     //        UserTokenPool.Push(userToken);
     //    }
     //}
@@ -248,44 +246,6 @@ public class IocpServer
         if (acceptArgs.SocketError is not SocketError.OperationAborted)
             StartAccept(acceptArgs); //把当前异步事件释放，等待下次连接
     }
-    /// <summary>
-    /// keep alive 设置
-    /// </summary>
-    /// <param name="onOff">是否开启（1为开，0为关）</param>
-    /// <param name="keepAliveTime">当开启keep-alive后，经过多长时间（ms）开启侦测</param>
-    /// <param name="keepAliveInterval">多长时间侦测一次（ms）</param>
-    /// <returns>keep alive 输入参数</returns>
-    private byte[] keepAlive(int onOff,int keepAliveTime,int keepAliveInterval)
-    {
-        byte[] buffer = new byte[12];
-        BitConverter.GetBytes(onOff).CopyTo(buffer, 0);
-        BitConverter.GetBytes(keepAliveTime).CopyTo(buffer, 4);
-        BitConverter.GetBytes(keepAliveInterval).CopyTo(buffer, 8);
-        return buffer;
-    }
-
-    void IO_Completed(object sender, SocketAsyncEventArgs asyncEventArgs)
-    {
-        AsyncUserToken userToken = asyncEventArgs.UserToken as AsyncUserToken;
-        //userToken.ActiveDateTime = DateTime.Now;
-        try
-        {
-            lock (userToken)
-            {
-                if (asyncEventArgs.LastOperation == SocketAsyncOperation.Receive)
-                    ProcessReceive(asyncEventArgs);
-                else if (asyncEventArgs.LastOperation == SocketAsyncOperation.Send)
-                    ProcessSend(asyncEventArgs);
-                else
-                    throw new ArgumentException("The last operation completed on the socket was not a receive or send");
-            }
-        }
-        catch (Exception E)
-        {
-            //ServerInstance.Logger.ErrorFormat("IO_Completed {0} error, message: {1}", userToken.AcceptSocket, E.Message);
-            //ServerInstance.Logger.Error(E.StackTrace);
-        }
-    }
 
     public void HandleReceiveMessage(string message, ServerFullHandlerProtocol protocol)
     {
@@ -355,18 +315,17 @@ public class IocpServer
         }
     }
 
-    private bool ProcessSend(SocketAsyncEventArgs sendEventArgs)
+    private void ProcessSend(SocketAsyncEventArgs sendEventArgs)
     {
         AsyncUserToken userToken = sendEventArgs.UserToken as AsyncUserToken;
         if (userToken.Protocol == null)
-            return false;
+            return;
         //userToken.ActiveDateTime = DateTime.Now;
         if (sendEventArgs.SocketError == SocketError.Success)
-            return userToken.Protocol.SendCompleted(); //调用子类回调函数
+            userToken.Protocol.SendCompleted(); //调用子类回调函数
         else
         {
             CloseClientSocket(userToken);
-            return false;
         }
     }
 

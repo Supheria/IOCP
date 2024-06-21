@@ -32,14 +32,44 @@ public class AsyncUserToken
 
     public event AsyncUserTokenEvent? OnClosed;
 
-    public AsyncUserToken(IocpServer server)
+    Action<SocketAsyncEventArgs> ProcessReceiveOperation { get; }
+
+    Action<SocketAsyncEventArgs> ProcessSendOperation { get; }
+
+    public AsyncUserToken(IocpServer server, Action<SocketAsyncEventArgs> processReceiveOperation, Action<SocketAsyncEventArgs> processSendOperation)
     {
         Server = server;
         ReceiveAsyncArgs.UserToken = this;
         SendAsyncArgs.UserToken = this;
         ReceiveAsyncArgs.SetBuffer(new byte[ReceiveBuffer.BufferSize], 0, ReceiveBuffer.BufferSize);
+        ProcessReceiveOperation = processReceiveOperation;
+        ProcessSendOperation = processSendOperation;
+        ReceiveAsyncArgs.Completed += CompleteIO;
+        SendAsyncArgs.Completed += CompleteIO;
     }
 
+    void CompleteIO(object? sender, SocketAsyncEventArgs asyncEventArgs)
+    {
+        AsyncUserToken userToken = asyncEventArgs.UserToken as AsyncUserToken;
+        //userToken.ActiveDateTime = DateTime.Now;
+        try
+        {
+            lock (userToken)
+            {
+                if (asyncEventArgs.LastOperation == SocketAsyncOperation.Receive)
+                    ProcessReceiveOperation(asyncEventArgs);
+                else if (asyncEventArgs.LastOperation == SocketAsyncOperation.Send)
+                    ProcessSendOperation(asyncEventArgs);
+                else
+                    throw new ArgumentException("The last operation completed on the socket was not a receive or send");
+            }
+        }
+        catch (Exception E)
+        {
+            //ServerInstance.Logger.ErrorFormat("CompleteIO {0} error, message: {1}", userToken.AcceptSocket, E.Message);
+            //ServerInstance.Logger.Error(E.StackTrace);
+        }
+    }
 
     [MemberNotNullWhen(true, nameof(AcceptSocket))]
     public bool ProcessAccept(Socket? acceptSocket)
