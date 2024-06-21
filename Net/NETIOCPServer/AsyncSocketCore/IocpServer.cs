@@ -65,7 +65,7 @@ public class IocpServer
         DaemonThread = new(ProcessDaemon);
         for (int i = 0; i < ParallelCountMax; i++) //按照连接数建立读写对象
         {
-            var userToken = new AsyncUserToken(this, ProcessReceive, ProcessSend);
+            var userToken = new AsyncUserToken(this, ProcessSend);
             userToken.OnClosed += () =>
             {
                 //HACK: ClientCountMax.Release();
@@ -149,7 +149,7 @@ public class IocpServer
         //ServerInstance.Logger.Info("Server is Stoped");
     }
 
-    public void StartAccept(SocketAsyncEventArgs acceptEventArgs)
+    public void StartAccept(SocketAsyncEventArgs? acceptEventArgs)
     {
         if (acceptEventArgs == null)
         {
@@ -180,9 +180,10 @@ public class IocpServer
         OnParallelRemainChange?.Invoke(UserTokenPool.Count);
         try
         {
-            if (!userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs))
-                lock (userToken)
-                    ProcessReceive(userToken.ReceiveAsyncArgs);
+            userToken.ReceiveAsync();
+            //if (!userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs))
+            //    lock (userToken)
+            //        userToken.ProcessReceive();
             OnClientNumberChange?.Invoke(ClientState.Connect, userToken);
         }
         catch (Exception E)
@@ -199,74 +200,6 @@ public class IocpServer
         OnReceiveMessage?.Invoke(message, protocol);
     }
 
-    private void ProcessReceive(SocketAsyncEventArgs receiveArgs)
-    {
-        if (receiveArgs.UserToken is not AsyncUserToken userToken)
-            return;
-        if (userToken.AcceptSocket is null)
-            return;
-        if (userToken.ReceiveAsyncArgs.BytesTransferred <= 0 || userToken.ReceiveAsyncArgs.SocketError is not SocketError.Success)
-            goto CLOSE;
-        var offset = userToken.ReceiveAsyncArgs.Offset;
-        var count = userToken.ReceiveAsyncArgs.BytesTransferred;
-        if (userToken.Protocol is null)
-        {
-            if (userToken.BuildProtocol())
-            {
-                offset++;
-                count--;
-            }
-            else
-                goto CLOSE;
-        }
-        //userToken.ActiveDateTime = DateTime.Now;
-        if (count > 0 && !userToken.Protocol.ProcessReceive(userToken.ReceiveAsyncArgs.Buffer, offset, count))
-            goto CLOSE;
-        if (!userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs))
-            ProcessReceive(userToken.ReceiveAsyncArgs);
-        return;
-    CLOSE:
-        // 接收数据长度为0或者SocketError 不等于 SocketError.Success表示socket已经断开，所以服务端执行断开清理工作
-        userToken.Close();
-    }
-
-
-
-    //private void ProcessReceive(SocketAsyncEventArgs receiveArgs)
-    //{
-    //    if (receiveArgs.UserToken is not AsyncUserToken userToken)
-    //        return;
-    //    if (userToken.AcceptSocket is null)
-    //        return;
-    //    if (userToken.ReceiveAsyncArgs.Buffer is null || userToken.ReceiveAsyncArgs.BytesTransferred <= 0 || userToken.ReceiveAsyncArgs.SocketError is not SocketError.Success)
-    //        goto CLOSE;
-    //    if (!userToken.BuildProtocol())
-    //        goto CLOSE;
-    //    //userToken.ActiveDateTime = DateTime.Now;
-    //    var offset = userToken.ReceiveAsyncArgs.Offset + 1;
-    //    var count = userToken.ReceiveAsyncArgs.BytesTransferred - 1;
-    //    if (count > 0 && !userToken.Protocol.ProcessReceive(userToken.ReceiveAsyncArgs.Buffer, offset, count))
-    //        goto CLOSE;
-    //    if (!userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs))
-    //        ProcessReceive(userToken.ReceiveAsyncArgs);
-    //    return;
-    //CLOSE:
-    //    // 接收数据长度为0或者SocketError 不等于 SocketError.Success表示socket已经断开，所以服务端执行断开清理工作
-    //    userToken.Close();
-
-    //}
-
-    private void BuildingSocketInvokeElement(AsyncUserToken userToken)
-    {
-        byte flag = userToken.ReceiveAsyncArgs.Buffer[userToken.ReceiveAsyncArgs.Offset];
-        if (flag == (byte)IocpProtocolTypes.FullHandler)
-            userToken.Protocol = new ServerFullHandlerProtocol(this, userToken);//全功能处理协议                   
-        if (userToken.Protocol != null)
-        {
-            //ServerInstance.Logger.InfoFormat("Building socket invoke element {0}.Local Address: {1}, Remote Address: {2}",
-            //    userToken.Protocol, userToken.AcceptSocket.LocalEndPoint, userToken.AcceptSocket.RemoteEndPoint);
-        }
-    }
 
     private void ProcessSend(SocketAsyncEventArgs sendEventArgs)
     {

@@ -32,17 +32,16 @@ public class AsyncUserToken
 
     public event AsyncUserTokenEvent? OnClosed;
 
-    Action<SocketAsyncEventArgs> ProcessReceiveOperation { get; }
-
     Action<SocketAsyncEventArgs> ProcessSendOperation { get; }
 
-    public AsyncUserToken(IocpServer server, Action<SocketAsyncEventArgs> processReceiveOperation, Action<SocketAsyncEventArgs> processSendOperation)
+    object Locker { get; } = new();
+
+    public AsyncUserToken(IocpServer server, Action<SocketAsyncEventArgs> processSendOperation)
     {
         Server = server;
         ReceiveAsyncArgs.UserToken = this;
         SendAsyncArgs.UserToken = this;
         ReceiveAsyncArgs.SetBuffer(new byte[ReceiveBuffer.BufferSize], 0, ReceiveBuffer.BufferSize);
-        ProcessReceiveOperation = processReceiveOperation;
         ProcessSendOperation = processSendOperation;
         ReceiveAsyncArgs.Completed += CompleteIO;
         SendAsyncArgs.Completed += CompleteIO;
@@ -57,7 +56,7 @@ public class AsyncUserToken
             lock (userToken)
             {
                 if (asyncEventArgs.LastOperation == SocketAsyncOperation.Receive)
-                    ProcessReceiveOperation(asyncEventArgs);
+                    ProcessReceive(asyncEventArgs);
                 else if (asyncEventArgs.LastOperation == SocketAsyncOperation.Send)
                     ProcessSendOperation(asyncEventArgs);
                 else
@@ -132,13 +131,16 @@ public class AsyncUserToken
     public void ReceiveAsync()
     {
         if (AcceptSocket is not null && !AcceptSocket.ReceiveAsync(ReceiveAsyncArgs))
-            ProcessReceive(ReceiveAsyncArgs);
+        {
+            lock (Locker)
+                ProcessReceive();
+        }
     }
 
-    //public void ProcessReceive()
-    //{
-    //    ProcessReceive(ReceiveAsyncArgs);
-    //}
+    public void ProcessReceive()
+    {
+        ProcessReceive(ReceiveAsyncArgs);
+    }
 
     public static void ProcessReceive(SocketAsyncEventArgs receiveArgs)
     {
@@ -148,20 +150,30 @@ public class AsyncUserToken
             return;
         if (userToken.ReceiveAsyncArgs.Buffer is null || userToken.ReceiveAsyncArgs.BytesTransferred <= 0 || userToken.ReceiveAsyncArgs.SocketError is not SocketError.Success)
             goto CLOSE;
-        userToken.SocketInfo.Active();
-        if (!userToken.BuildProtocol())
-            goto CLOSE;
-        var offset = userToken.ReceiveAsyncArgs.Offset + 1;
-        var count = userToken.ReceiveAsyncArgs.BytesTransferred - 1;
-        // 处理接收数据
+        var offset = userToken.ReceiveAsyncArgs.Offset;
+        var count = userToken.ReceiveAsyncArgs.BytesTransferred;
+        if (userToken.Protocol is null)
+        {
+            if (userToken.BuildProtocol())
+            {
+                offset++;
+                count--;
+            }
+            else
+                goto CLOSE;
+        }
+        //userToken.ActiveDateTime = DateTime.Now;
         if (count > 0 && !userToken.Protocol.ProcessReceive(userToken.ReceiveAsyncArgs.Buffer, offset, count))
             goto CLOSE;
-        userToken.ReceiveAsync();
+        if (!userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs))
+            userToken.ProcessReceive();
         return;
     CLOSE:
+        // 接收数据长度为0或者SocketError 不等于 SocketError.Success表示socket已经断开，所以服务端执行断开清理工作
         userToken.Close();
     }
 
+    [MemberNotNullWhen(true, nameof(Protocol))]
     public bool BuildProtocol()
     {
         if (AcceptSocket is null || ReceiveAsyncArgs.Buffer is null)

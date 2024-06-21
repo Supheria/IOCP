@@ -54,17 +54,21 @@ public class ClientTestBoostForm : ResizeableForm
         //Thread.Sleep(1000);
         //
         c2.Disconnet();
+        c1.Disconnet();
         c3 = new("c3");
         c3.OnUpdateMessage += UpdateMessage;
         c3.Connet(ipAddress, port);
         //
         Thread.Sleep(10);
         //
-        //c1.SendMessage("c1;Hello World;");
+        c2.Connet(ipAddress, port);
+        c1.Connet(ipAddress, port);
+        c1.SendMessage("c1;Hello World;");
         c1.UploadFile(UploadFilePath);
         //
         Thread.Sleep(10);
         //
+        c2.SendMessage("c2;Hello Host;");
         var uploadedPath = Path.Combine("upload", UploadFilePath);
         var downloadedPath = Path.Combine("download", uploadedPath);
         if (File.Exists(downloadedPath))
