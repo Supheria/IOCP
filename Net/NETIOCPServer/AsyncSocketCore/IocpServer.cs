@@ -1,8 +1,5 @@
-﻿using Net;
-using System;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
-using System.Threading;
 
 namespace Net;
 
@@ -15,7 +12,7 @@ public class IocpServer
     /// <summary>
     /// 最大支持连接个数
     /// </summary>
-    int ParalleCountMax { get; }
+    int ParallelCountMax { get; }
 
     // TODO: remove this and use another way to limit paralle number
     /// <summary>
@@ -48,7 +45,7 @@ public class IocpServer
 
     public delegate void ReceiveClientData(AsyncUserToken userToken, byte[] data);
 
-    public delegate void ParalleRemainChange(int remain);
+    public delegate void ParallelRemainChange(int remain);
 
     public event HandleMessage? OnReceiveMessage;
 
@@ -56,17 +53,17 @@ public class IocpServer
 
     public event ReceiveClientData? OnReceiveClientData;
 
-    public event ParalleRemainChange? OnParalleRemainChange;
+    public event ParallelRemainChange? OnParallelRemainChange;
 
-    public IocpServer(int paralleCountMax, int timeoutMilliseconds)
+    public IocpServer(int parallelCountMax, int timeoutMilliseconds)
     {
-        ParalleCountMax = paralleCountMax;
+        ParallelCountMax = parallelCountMax;
         //HACK: m_receiveBufferSize = ConstTabel.ReceiveBufferSize;
-        UserTokenPool = new(paralleCountMax);
-        ClientCountMax = new(paralleCountMax, paralleCountMax);
+        UserTokenPool = new(parallelCountMax);
+        ClientCountMax = new(parallelCountMax, parallelCountMax);
         //HACK: m_fullHandlerSocketProtocolMgr = new FullHandlerSocketProtocolMgr();//所有新加入的服务端协议，必须在此处实例化
         DaemonThread = new(ProcessDaemon);
-        for (int i = 0; i < ParalleCountMax; i++) //按照连接数建立读写对象
+        for (int i = 0; i < ParallelCountMax; i++) //按照连接数建立读写对象
         {
             var userToken = new AsyncUserToken(this, ProcessReceive, ProcessSend);
             userToken.OnClosed += () =>
@@ -75,7 +72,7 @@ public class IocpServer
                 UserTokenPool.Push(userToken);
                 UserTokenList.Remove(userToken);
                 OnClientNumberChange?.Invoke(ClientState.Disconnect, userToken);
-                OnParalleRemainChange?.Invoke(UserTokenPool.Count);
+                OnParallelRemainChange?.Invoke(UserTokenPool.Count);
             };
             UserTokenPool.Push(userToken);
         }
@@ -127,7 +124,7 @@ public class IocpServer
         var localEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), port);
         Core = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);            
         Core.Bind(localEndPoint);
-        Core.Listen(ParalleCountMax);
+        Core.Listen(ParallelCountMax);
         //ServerInstance.Logger.InfoFormat("Start listen socket {0} success", localEndPoint.ToString());
         //for (int i = 0; i < 64; i++) //不能循环投递多次AcceptAsync，会造成只接收8000连接后不接收连接了
         StartAccept(null);
@@ -180,7 +177,7 @@ public class IocpServer
         }
         UserTokenList.Add(userToken);
         //HACK: ClientCountMax.WaitOne(); //获取信号量
-        OnParalleRemainChange?.Invoke(UserTokenPool.Count);
+        OnParallelRemainChange?.Invoke(UserTokenPool.Count);
         try
         {
             if (!userToken.AcceptSocket.ReceiveAsync(userToken.ReceiveAsyncArgs))

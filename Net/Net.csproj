@@ -9,6 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="NETIOCPServer\AsyncSocketProtocolCore\**" />
+    <EmbeddedResource Remove="NETIOCPServer\AsyncSocketProtocolCore\**" />
+    <None Remove="NETIOCPServer\AsyncSocketProtocolCore\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="NETIOCPCommon\log4net.dll" />
   </ItemGroup>
 
@@ -23,10 +29,6 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="ServerDemo\Server.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="NETIOCPServer\AsyncSocketProtocolCore\" />
   </ItemGroup>
 
 </Project>

@@ -10,7 +10,26 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="bin\**" />
+    <EmbeddedResource Remove="bin\**" />
+    <None Remove="bin\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="TextSource.Designer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Remove="TextSource.resx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="express test.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Net\Net.csproj" />
+    <ProjectReference Include="..\_lib\LocalUtilities\LocalUtilities.csproj" />
   </ItemGroup>
 
 </Project>

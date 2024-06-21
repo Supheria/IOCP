@@ -7,6 +7,11 @@ using System.IO;
 
 namespace Net;
 
+/// <summary>
+/// 全功能处理协议
+/// </summary>
+/// <param name="server"></param>
+/// <param name="userToken"></param>
 public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userToken) : IocpServerProtocol(IocpProtocolTypes.FullHandler, server, userToken)
 {
     enum Command

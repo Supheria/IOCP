@@ -48,7 +48,7 @@ namespace ClientDemo
             try
             {               
                 ClientFullHandlerSocket_MSG.Connect(textBox_IP.Text, Convert.ToInt32(textBox_Port.Text));//增强实时性，使用无延迟发送
-                ClientFullHandlerSocket_MSG.localFilePath = @"d:\temp";
+                ClientFullHandlerSocket_MSG.localFilePath = "download";
                 ClientFullHandlerSocket_MSG.appHandler = new AppHandler();
                 ClientFullHandlerSocket_MSG.appHandler.OnReceivedMsg += new AppHandler.HandlerReceivedMsg(appHandler_OnReceivedMsg);//接收到消息后处理事件
                 ClientFullHandlerSocket_MSG.ReceiveMessageHead();

@@ -75,7 +75,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
         private FileStream m_fileStream;
         private bool m_sendFile;
         private byte[] m_readBuffer;
-        private DownloadEvent DE;//下载完成后的事件
+        private DownloadEvent DE { get; }//下载完成后的事件
         private UploadEvent UE;//上传完成后的事件
         public AppHandler appHandler;//接收到消息后的处理事件
         public ILog logger;

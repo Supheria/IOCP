@@ -10,7 +10,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DX29_Net\Iocp_Net_raw.csproj" />
+    <Compile Remove="bin\**" />
+    <Compile Remove="gen\**" />
+    <EmbeddedResource Remove="bin\**" />
+    <EmbeddedResource Remove="gen\**" />
+    <None Remove="bin\**" />
+    <None Remove="gen\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Net\Net.csproj" />
     <ProjectReference Include="..\_lib\LocalUtilities\LocalUtilities.csproj" />
   </ItemGroup>

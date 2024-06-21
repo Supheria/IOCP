@@ -7,7 +7,8 @@ namespace ClientTest
         [STAThread]
         static void Main()
         {
-            Application.Run(new Client());
+            //new Client().Show();
+            Application.Run(new ClientTestBoostForm());
         }
     }
 }
