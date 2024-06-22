@@ -73,7 +73,7 @@ namespace ClientDemo
         {
             try
             {
-                ClientFullHandlerSocket_MSG.SendMessageQuick(textBox_msg.Text);
+                ClientFullHandlerSocket_MSG.SendMessage(textBox_msg.Text);
             }
             catch (Exception ex)
             {

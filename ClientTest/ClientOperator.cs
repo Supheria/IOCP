@@ -105,7 +105,7 @@ public class ClientOperator
     {
         try
         {
-            ClientFullHandlerSocket_MSG.SendMessageQuick(message);
+            ClientFullHandlerSocket_MSG.SendMessage(message);
         }
         catch (Exception ex)
         {

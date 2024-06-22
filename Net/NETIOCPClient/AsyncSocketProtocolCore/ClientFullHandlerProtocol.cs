@@ -103,50 +103,52 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
     /// </summary>
     public AppHandler AppHandler { get; set; } = new();
 
+    // HACK: public void SendMessage(string msg)
+    //{
+    //    bool bConnect = ReConnectAndLogin(); //检测连接是否还在，如果断开则重连并登录
+    //    if (!bConnect)
+    //    {
+    //        //Logger.Error("AsyncClientFullHandlerSocket.SendMessage:" + "Socket disconnect");
+    //        throw new Exception("Server is Stoped"); //抛异常是为了让前台知道网络链路的情况         
+    //    }
+    //    else
+    //    {
+    //        CommandComposer.Clear();
+    //        CommandComposer.AddRequest();
+    //        CommandComposer.AddCommand(ProtocolKey.Message);
+    //        byte[] bufferMsg = Encoding.UTF8.GetBytes(msg);
+    //        SendCommand(bufferMsg, 0, bufferMsg.Length);
+    //    }
+    //}
+
     /// <summary>
     /// 向服务端发送消息，由消息来驱动业务逻辑，接收方必须返回应答，否则认为发送失败
     /// </summary>
     /// <param name="msg">消息内容</param>
-    public void SendMessage(string msg)
+
+    public void SendMessage(string message)
     {
-        bool bConnect = ReConnectAndLogin(); //检测连接是否还在，如果断开则重连并登录
-        if (!bConnect)
-        {
-            //Logger.Error("AsyncClientFullHandlerSocket.SendMessage:" + "Socket disconnect");
-            throw new Exception("Server is Stoped"); //抛异常是为了让前台知道网络链路的情况         
-        }
-        else
-        {
-            CommandComposer.Clear();
-            CommandComposer.AddRequest();
-            CommandComposer.AddCommand(ProtocolKey.Message);
-            byte[] bufferMsg = Encoding.UTF8.GetBytes(msg);
-            SendCommand(bufferMsg, 0, bufferMsg.Length);
-        }
-    }
-    public void SendMessageQuick(string msg)
-    {
+        CommandComposer.Clear();
+        CommandComposer.AddRequest();
+        CommandComposer.AddCommand(ProtocolKey.Message);
+        var bufferMsg = Encoding.UTF8.GetBytes(message);
         try
         {
-            CommandComposer.Clear();
-            CommandComposer.AddRequest();
-            CommandComposer.AddCommand(ProtocolKey.Message);
-            byte[] bufferMsg = Encoding.UTF8.GetBytes(msg);
             SendCommand(bufferMsg, 0, bufferMsg.Length);
         }
-        catch (Exception e)
+        catch (Exception ex)
         {
             //logger.Error("SendMessage error:" + e.Message);
-            bool bConnect = ReConnectAndLogin(); //检测连接是否还在，如果断开则重连并登录
-            if (!bConnect)
+            if (!ReConnectAndLogin()) // 检测连接是否还在，如果断开则重连并登录
             {
                 //Logger.Error("AsyncClientFullHandlerSocket.SendMessage:" + "Socket disconnect");
-                throw new Exception("Server is Stoped"); //抛异常是为了让前台知道网络链路的情况         
+                throw new ClientProtocolException("Server is Stoped"); //抛异常是为了让前台知道网络链路的情况         
             }
-            else
-                SendMessageQuick(msg);
+            // TODO: here maybe dead loop
+            SendMessage(message);
         }
     }
+
     /// <summary>
     /// 循环接收消息
     /// </summary>
@@ -156,6 +158,7 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
         state.workSocket = Client.Core;
         Client.Core.BeginReceive(ReceiveBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);
     }
+
     public void ReceiveMessageHeadCallBack(IAsyncResult ar)
     {
         try
@@ -185,6 +188,7 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
             //Logger.Error("AsyncClientFullHandlerSocket.ReceiveMessageHeadCallBack:" + ex.Message);
         }
     }
+
     private void ReceiveMessageDataCallback(IAsyncResult ar)
     {
         try
@@ -429,6 +433,8 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
             return false;
         }
     }
+
+
     public new bool ReConnectAndLogin()//重新定义，防止使用基类的方法
     {
         if (BasicFunc.SocketConnected(Client.Core) && (DoActive()))

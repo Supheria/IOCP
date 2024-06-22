@@ -64,7 +64,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         CommandComposer.AddCommand(ProtocolKey.Message);
         CommandComposer.AddSuccess();
         byte[] Buffer = Encoding.UTF8.GetBytes(msg);
-        SendBackResult(Buffer, 0, Buffer.Length);
+        SendCommand(Buffer, 0, Buffer.Length);
     }
 
     /// <summary>

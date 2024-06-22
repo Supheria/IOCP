@@ -120,7 +120,7 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
     protected bool CommandFail(int errorCode, string message)
     {
         CommandComposer.AddFailure(errorCode, message);
-        SendBackResult();
+        SendCommand();
         return false;
     }
 
@@ -134,16 +134,16 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
         CommandComposer.AddSuccess();
         foreach (var (key, value) in addValues)
             CommandComposer.AddValue(key, value.ToString() ?? "");
-        SendBackResult(buffer, offset, count);
+        SendCommand(buffer, offset, count);
         return true;
     }
 
-    protected void SendBackResult()
+    protected void SendCommand()
     {
-        SendBackResult([], 0, 0);
+        SendCommand([], 0, 0);
     }
 
-    protected void SendBackResult(byte[] buffer, int offset, int count)
+    protected void SendCommand(byte[] buffer, int offset, int count)
     {
         // 获取命令
         var commandText = CommandComposer.GetProtocolText();
@@ -172,17 +172,17 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
     /// <param name="buffer"></param>
     /// <param name="offset"></param>
     /// <param name="count"></param>
-    protected void SendBackBuffer(byte[] buffer, int offset, int count)
-    {
-        UserToken.SendBuffer.StartPacket();
-        UserToken.SendBuffer.DynamicBufferManager.WriteBuffer(buffer, offset, count);
-        UserToken.SendBuffer.EndPacket();
-        if (IsSendingAsync)
-            return;
-        if (!UserToken.SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
-            return;
-        IsSendingAsync = true;
-        UserToken.SendAsync(packetOffset, packetCount);
-        return;
-    }
+    // HACK: protected void SendBuffer(byte[] buffer, int offset, int count)
+    //{
+    //    UserToken.SendBuffer.StartPacket();
+    //    UserToken.SendBuffer.DynamicBufferManager.WriteBuffer(buffer, offset, count);
+    //    UserToken.SendBuffer.EndPacket();
+    //    if (IsSendingAsync)
+    //        return;
+    //    if (!UserToken.SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
+    //        return;
+    //    IsSendingAsync = true;
+    //    UserToken.SendAsync(packetOffset, packetCount);
+    //    return;
+    //}
 }
