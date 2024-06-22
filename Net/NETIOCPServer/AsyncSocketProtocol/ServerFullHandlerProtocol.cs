@@ -187,47 +187,32 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     /// <returns></returns>
     public bool DoUpload()
     {
-        if (CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir) &
-            CommandParser.GetValueAsString(ProtocolKey.FileName, out var filePath) & 
-            CommandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize) & 
-            CommandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize))
+        if (!CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir) ||
+            !CommandParser.GetValueAsString(ProtocolKey.FileName, out var filePath) ||
+            !CommandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize) /*||*/
+            /*!CommandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize)*/)
+            return CommandFail(ProtocolCode.ParameterError, "");
+        // TODO: modified here for uniform
+        dir = dir is "" ? RootDirectoryPath : RootDirectoryPath;
+        if (!Directory.Exists(dir))
+            return CommandFail(ProtocolCode.DirNotExist, dir);
+        FilePath = Path.Combine(dir, filePath);
+        FileStream?.Close();
+        FileStream = null;
+        if (File.Exists(FilePath))
         {
-            ReceivedFileSize = fileSize;
-            if (dir == "")
-                dir = RootDirectoryPath;
-            filePath = Path.Combine(dir, filePath);
-            //ServerInstance.Logger.Info("Start Receive file: " + filePath);
-            if (FileStream != null) //关闭上次传输的文件
+            if (CheckFileInUse(FilePath))
             {
-                FileStream.Close();
-                FileStream = null;
                 FilePath = "";
+                return CommandFail(ProtocolCode.FileIsInUse, "");
+                //ServerInstance.Logger.Error("Start Receive file error, file is in use: " + filePath);
             }
-            if (File.Exists(filePath))//本地存在，则删除重建
-            {
-                if (!CheckFileInUse(filePath)) //检测文件是否正在使用中
-                {
-                    File.Delete(filePath);
-                    FilePath = filePath;
-                    FileStream = new FileStream(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-                    CommandComposer.AddSuccess();
-                    IsReceivingFile = true;
-                }
-                else
-                {
-                    CommandComposer.AddFailure(ProtocolCode.FileIsInUse, "");
-                    //ServerInstance.Logger.Error("Start Receive file error, file is in use: " + filePath);
-                }
-            }
-            else
-            {
-                FilePath = filePath;
-                FileStream = new FileStream(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-                CommandComposer.AddSuccess();
-                IsReceivingFile = true;
-            }
+            File.Delete(FilePath);
         }
-        return SendBackResult();
+        FileStream = new FileStream(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+        IsReceivingFile = true;
+        ReceivedFileSize = fileSize;
+        return CommandSucceed();
     }
 
     /// <summary>

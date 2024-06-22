@@ -22,6 +22,8 @@ public class AsyncSendBufferManager(int bufferSize)
 
     SendBufferPacket SendPacket { get; set; } = new();
 
+    object Locker { get; } = new();
+
     public void StartPacket()
     {
         SendPacket = new()
@@ -52,14 +54,20 @@ public class AsyncSendBufferManager(int bufferSize)
     {
         if (SendPacketList.Count <= 0)
             return false;
-        DynamicBufferManager.Clear(SendPacketList[0].Count);
-        SendPacketList.RemoveAt(0);
+        lock (Locker)
+        {
+            DynamicBufferManager.Clear(SendPacketList[0].Count);
+            SendPacketList.RemoveAt(0);
+        }
         return true;
     }
 
     public void ClearPacket()
     {
-        SendPacketList.Clear();
-        DynamicBufferManager.Clear(DynamicBufferManager.DataCount);
+        lock (Locker)
+        {
+            SendPacketList.Clear();
+            DynamicBufferManager.Clear(DynamicBufferManager.DataCount);
+        }
     }
 }
