@@ -6,9 +6,9 @@ namespace ClientDemo
 {
     public partial class Client : Form
     {
-        private AsyncClientFullHandlerSocket ClientFullHandlerSocket_MSG;
-        private AsyncClientFullHandlerSocket ClientFullHandlerSocket_UPLOAD;
-        private AsyncClientFullHandlerSocket ClientFullHandlerSoclet_DOWNLOAD;
+        private ClientFullHandlerProtocol ClientFullHandlerSocket_MSG;
+        private ClientFullHandlerProtocol ClientFullHandlerSocket_UPLOAD;
+        private ClientFullHandlerProtocol ClientFullHandlerSoclet_DOWNLOAD;
         private DownloadEvent downLoadEvent;//下载完成事件
         private UploadEvent uploadEvent;//上传完成事件
         private bool stop = false;
@@ -39,20 +39,20 @@ namespace ClientDemo
 
         private void button_connect_Click(object sender, EventArgs e)
         {
-            ClientFullHandlerSocket_MSG = new AsyncClientFullHandlerSocket(null, null);//消息发送不需要挂接事件
+            ClientFullHandlerSocket_MSG = new ClientFullHandlerProtocol(null, null);//消息发送不需要挂接事件
             //ClientFullHandlerSocket_MSG.SetNoDelay(true);
             try
             {
                 ClientFullHandlerSocket_MSG.Connect(textBox_IP.Text, Convert.ToInt32(textBox_Port.Text));//增强实时性，使用无延迟发送
-                ClientFullHandlerSocket_MSG.localFilePath = @"d:\temp";
-                ClientFullHandlerSocket_MSG.appHandler = new AppHandler();
-                ClientFullHandlerSocket_MSG.appHandler.OnReceivedMsg += new AppHandler.HandlerReceivedMsg(appHandler_OnReceivedMsg);//接收到消息后处理事件
+                ClientFullHandlerSocket_MSG.LocalFilePath = @"d:\temp";
+                ClientFullHandlerSocket_MSG.AppHandler = new AppHandler();
+                ClientFullHandlerSocket_MSG.AppHandler.OnReceivedMsg += new AppHandler.HandlerReceivedMsg(appHandler_OnReceivedMsg);//接收到消息后处理事件
                 ClientFullHandlerSocket_MSG.ReceiveMessageHead();
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
-                ClientFullHandlerSocket_MSG.logger.Info("Connect failed");
+                //ClientFullHandlerSocket_MSG.logger.Info("Connect failed");
                 return;
             }
             //login
@@ -60,12 +60,12 @@ namespace ClientDemo
             {
                 button_connect.Text = "Connected";
                 button_connect.Enabled = false;
-                ClientFullHandlerSocket_MSG.logger.Info("Login success");
+                //ClientFullHandlerSocket_MSG.logger.Info("Login success");
             }
             else
             {
                 MessageBox.Show("Login failed");
-                ClientFullHandlerSocket_MSG.logger.Info("Login failed");
+                //ClientFullHandlerSocket_MSG.logger.Info("Login failed");
             }
         }
 
@@ -102,9 +102,9 @@ namespace ClientDemo
         {
             if (ClientFullHandlerSocket_UPLOAD == null)
             {
-                ClientFullHandlerSocket_UPLOAD = new AsyncClientFullHandlerSocket(null, uploadEvent);//只挂接上传事件
+                ClientFullHandlerSocket_UPLOAD = new ClientFullHandlerProtocol(null, uploadEvent);//只挂接上传事件
                 ClientFullHandlerSocket_UPLOAD.Connect("127.0.0.1", 8000);
-                ClientFullHandlerSocket_UPLOAD.localFilePath = @"d:\temp";
+                ClientFullHandlerSocket_UPLOAD.LocalFilePath = @"d:\temp";
                 ClientFullHandlerSocket_UPLOAD.ReceiveMessageHead();
                 ClientFullHandlerSocket_UPLOAD.DoLogin("admin", "password");
             }
@@ -135,9 +135,9 @@ namespace ClientDemo
         {
             if (ClientFullHandlerSoclet_DOWNLOAD == null)
             {
-                ClientFullHandlerSoclet_DOWNLOAD = new AsyncClientFullHandlerSocket(downLoadEvent, null);//只挂接下载事件
+                ClientFullHandlerSoclet_DOWNLOAD = new ClientFullHandlerProtocol(downLoadEvent, null);//只挂接下载事件
                 ClientFullHandlerSoclet_DOWNLOAD.Connect("127.0.0.1", 8000);
-                ClientFullHandlerSoclet_DOWNLOAD.localFilePath = @"d:\temp";
+                ClientFullHandlerSoclet_DOWNLOAD.LocalFilePath = @"d:\temp";
                 ClientFullHandlerSoclet_DOWNLOAD.ReceiveMessageHead();
                 ClientFullHandlerSoclet_DOWNLOAD.DoLogin("admin", "password");
             }

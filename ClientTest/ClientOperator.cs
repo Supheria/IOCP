@@ -23,11 +23,11 @@ public class ClientOperator
 
     public event UpdateMessage? OnUpdateMessage;
 
-    AsyncClientFullHandlerSocket ClientFullHandlerSocket_MSG { get; set; }
+    ClientFullHandlerProtocol ClientFullHandlerSocket_MSG { get; set; }
 
-    AsyncClientFullHandlerSocket ClientFullHandlerSocket_UPLOAD { get; set; }
+    ClientFullHandlerProtocol ClientFullHandlerSocket_UPLOAD { get; set; }
 
-    AsyncClientFullHandlerSocket ClientFullHandlerSoclet_DOWNLOAD { get; set; }
+    ClientFullHandlerProtocol ClientFullHandlerSoclet_DOWNLOAD { get; set; }
 
     /// <summary>
     /// 下载完成事件
@@ -56,9 +56,9 @@ public class ClientOperator
         try
         {
             ClientFullHandlerSocket_MSG.Connect(ipAddress, port);//增强实时性，使用无延迟发送
-            ClientFullHandlerSocket_MSG.localFilePath = @"d:\temp";
-            ClientFullHandlerSocket_MSG.appHandler = new AppHandler();
-            ClientFullHandlerSocket_MSG.appHandler.OnReceivedMsg += new AppHandler.HandlerReceivedMsg(appHandler_OnReceivedMsg);//接收到消息后处理事件
+            ClientFullHandlerSocket_MSG.LocalFilePath = @"d:\temp";
+            ClientFullHandlerSocket_MSG.AppHandler = new AppHandler();
+            ClientFullHandlerSocket_MSG.AppHandler.OnReceivedMsg += new AppHandler.HandlerReceivedMsg(appHandler_OnReceivedMsg);//接收到消息后处理事件
             ClientFullHandlerSocket_MSG.ReceiveMessageHead();
         }
         catch (Exception ex)
@@ -86,17 +86,17 @@ public class ClientOperator
     {
         try
         {
-            ClientFullHandlerSocket_MSG.Disconnect();
+            ClientFullHandlerSocket_MSG?.Disconnect();
         }
         catch { }
         try
         {
-            ClientFullHandlerSocket_UPLOAD.Disconnect();
+            ClientFullHandlerSocket_UPLOAD?.Disconnect();
         }
         catch { }
         try
         {
-            ClientFullHandlerSoclet_DOWNLOAD.Disconnect();
+            ClientFullHandlerSoclet_DOWNLOAD?.Disconnect();
         }
         catch { }
     }
@@ -127,9 +127,9 @@ public class ClientOperator
     {
         if (ClientFullHandlerSocket_UPLOAD == null)
         {
-            ClientFullHandlerSocket_UPLOAD = new AsyncClientFullHandlerSocket(null, UploadEvent);//只挂接上传事件
+            ClientFullHandlerSocket_UPLOAD = new ClientFullHandlerProtocol(null, UploadEvent);//只挂接上传事件
             ClientFullHandlerSocket_UPLOAD.Connect("127.0.0.1", 8000);
-            ClientFullHandlerSocket_UPLOAD.localFilePath = @"d:\temp";
+            ClientFullHandlerSocket_UPLOAD.LocalFilePath = @"d:\temp";
             ClientFullHandlerSocket_UPLOAD.ReceiveMessageHead();
             ClientFullHandlerSocket_UPLOAD.DoLogin("admin", "password");
         }
@@ -140,9 +140,9 @@ public class ClientOperator
     {
         if (ClientFullHandlerSoclet_DOWNLOAD == null)
         {
-            ClientFullHandlerSoclet_DOWNLOAD = new AsyncClientFullHandlerSocket(DownLoadEvent, null);//只挂接下载事件
+            ClientFullHandlerSoclet_DOWNLOAD = new ClientFullHandlerProtocol(DownLoadEvent, null);//只挂接下载事件
             ClientFullHandlerSoclet_DOWNLOAD.Connect("127.0.0.1", 8000);
-            ClientFullHandlerSoclet_DOWNLOAD.localFilePath = "download";
+            ClientFullHandlerSoclet_DOWNLOAD.LocalFilePath = "download";
             ClientFullHandlerSoclet_DOWNLOAD.ReceiveMessageHead();
             ClientFullHandlerSoclet_DOWNLOAD.DoLogin("admin", "password");
         }
