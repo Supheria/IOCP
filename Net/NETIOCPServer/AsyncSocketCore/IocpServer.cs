@@ -204,4 +204,14 @@ public class IocpServer
         lock (ServerFullHandlerProtocolManager)
             ServerFullHandlerProtocolManager.Remove(fullHandler);
     }
+
+    // TODO: make this reuseable
+    public delegate void HandleTip(string tip, ServerFullHandlerProtocol fullHandler);
+
+    public event HandleTip? OnTip;
+
+    public void Tip(string tip, ServerFullHandlerProtocol fullHandler)
+    {
+        OnTip?.Invoke(tip, fullHandler);
+    }
 }

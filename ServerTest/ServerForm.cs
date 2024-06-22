@@ -45,6 +45,12 @@ internal class ServerForm : ResizeableForm
         Server.OnReceiveMessage += Server_OnReceiveMessage;
         //Server.OnReceiveClientData += Server_ReceiveClientData;
         Server.OnParallelRemainChange += Server_OnParalleRemainChange;
+        Server.OnTip += Server_OnTip;
+    }
+
+    private void Server_OnTip(string tip, ServerFullHandlerProtocol fullHandler)
+    {
+        UpdateMessage($"tip: {fullHandler.UserToken.SocketInfo.RemoteEndPoint} {tip}");
     }
 
     private void Server_OnParalleRemainChange(int remain)
@@ -68,7 +74,7 @@ internal class ServerForm : ResizeableForm
             {
                 if (!string.IsNullOrWhiteSpace(s))
                 {
-                    UpdateMessage($"{protocol.UserToken.SocketInfo.RemoteEndPoint}{s}");
+                    UpdateMessage($"{protocol.UserToken.SocketInfo.RemoteEndPoint}: {s}");
                 }
             }
         }
