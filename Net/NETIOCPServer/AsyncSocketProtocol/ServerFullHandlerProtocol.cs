@@ -259,31 +259,28 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     {
         var message = Encoding.UTF8.GetString(buffer, offset, count);
         UserToken.Server.HandleReceiveMessage(message, this);
-        CommandComposer.AddSuccess();
-        return SendBackResult();
+        return CommandSucceed();
     }
+
     public new bool DoLogin()
     {
-        if (CommandParser.GetValueAsString(ProtocolKey.UserID, out var userID) & 
-            CommandParser.GetValueAsString(ProtocolKey.Password, out var password))
+        if (!CommandParser.GetValueAsString(ProtocolKey.UserID, out var userID) ||
+            !CommandParser.GetValueAsString(ProtocolKey.Password, out var password))
+            return CommandFail(ProtocolCode.ParameterError, "");
+        var success = userID is "admin" && password is "password";
+        if (!success)
         {
-            if (userID == "admin" && password == "password")
-            {
-                CommandComposer.AddSuccess();
-                UserID = "admin";
-                UserName = "admin";
-                IsLogin = true;
-                CommandComposer.AddValue(ProtocolKey.UserID, "admin");
-                CommandComposer.AddValue(ProtocolKey.UserName, "admin");
-                //ServerInstance.Logger.InfoFormat("{0} login success", userID);
-            }
-        }
-        else
-        {
-            CommandComposer.AddFailure(ProtocolCode.ParameterError, "");
             //ServerInstance.Logger.ErrorFormat("{0} login failure,password error", userID);
+            return CommandFail(ProtocolCode.UserOrPasswordError, "");
         }
-        return SendBackResult();
+        UserID = "admin";
+        UserName = "admin";
+        IsLogin = true;
+        //ServerInstance.Logger.InfoFormat("{0} login success", userID);
+        return CommandSucceed(
+            (ProtocolKey.UserID, "admin"),
+            (ProtocolKey.UserID, "admin")
+            );
     }
     
     public bool DoDir()
