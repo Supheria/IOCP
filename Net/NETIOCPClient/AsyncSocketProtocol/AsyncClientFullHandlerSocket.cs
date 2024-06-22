@@ -208,7 +208,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
                                 if (msg != string.Empty)
                                     Console.WriteLine("Message Recevied from Server: " + msg);
 #endif
-                                //DoHandlerMessage
+                                //DoHandleMessage
                                 if (!string.IsNullOrWhiteSpace(msg))
                                 {
                                     if (appHandler != null)

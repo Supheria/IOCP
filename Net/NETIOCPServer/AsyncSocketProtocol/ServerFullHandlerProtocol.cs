@@ -45,6 +45,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
 
     long ReceivedFileSize { get; set; } = 0;
 
+    // TODO: make the dir more common-useable
     public DirectoryInfo RootDirectory { get; set; } = Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "upload"));
 
     public string RootDirectoryPath => RootDirectory.FullName;
@@ -70,69 +71,90 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         byte[] Buffer = Encoding.UTF8.GetBytes(msg);
         SendBackResult(Buffer, 0, Buffer.Length);
     }
-    public override bool ProcessCommand(byte[] buffer, int offset, int count) //处理分完包的数据，子类从这个方法继承,服务端在此处处理所有的客户端命令请求，返回结果必须加入m_outgoingDataAssembler.AddResponse();
+
+    /// <summary>
+    /// 处理分完包的数据，子类从这个方法继承,服务端在此处处理所有的客户端命令请求，返回结果必须加入CommandComposer.AddResponse();
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="offset"></param>
+    /// <param name="count"></param>
+    /// <returns></returns>
+    public override bool ProcessCommand(byte[] buffer, int offset, int count)
     {
-        Command command = StrToCommand(CommandParser.Command);
         CommandComposer.Clear();
         CommandComposer.AddResponse();
         CommandComposer.AddCommand(CommandParser.Command);
-        if (!CheckLogined(command)) //检测登录
+        var command = StrToCommand(CommandParser.Command);
+        if (!CheckLogin(command)) //检测登录
+            return CommandFail(ProtocolCode.UserHasLogined, "");
+        try
         {
-            CommandComposer.AddFailure(ProtocolCode.UserHasLogined, "");
-            return SendBackResult();
+            return command switch
+            {
+                Command.Login => DoLogin(),
+                Command.Active => DoActive(),
+                Command.Message => DoHandleMessage(buffer, offset, count),
+                Command.Dir => DoDir(),
+                Command.FileList => DoFileList(),
+                Command.Download => DoDownload(),
+                Command.Upload => DoUpload(),
+                Command.SendFile => DoSendFile(),
+                Command.Data => DoData(buffer, offset, count),
+                _ => throw new ServerProtocolException("Unknow command: " + CommandParser.Command)
+            };
         }
-        if (command == Command.Login)
-            return DoLogin();
-        else if (command == Command.Active)
-            return DoActive();
-        else if (command == Command.Message)
-            return DoHandlerMessage(buffer, offset, count);
-        else if (command == Command.Dir)
-            return DoDir();
-        else if (command == Command.FileList)
-            return DoFileList();
-        else if (command == Command.Download)
-            return DoDownload();
-        else if (command == Command.Upload)
-            return DoUpload();
-        else if (command == Command.SendFile)
-            return DoSendFile();
-        else if (command == Command.Data)
-            return DoData(buffer, offset, count);
-        else
+        catch (Exception ex)
         {
+            return CommandFail(ProtocolCode.ParameterError, ex.Message);
             //ServerInstance.Logger.Error("Unknow command: " + CommandParser.Command);
-            return false;
+            //return false;
         }
     }
 
-    private Command StrToCommand(string command)//关键代码
+    /// <summary>
+    /// 关键代码
+    /// </summary>
+    /// <param name="command"></param>
+    /// <returns></returns>
+    private static Command StrToCommand(string command)
     {
-        if (command.Equals(ProtocolKey.Active, StringComparison.CurrentCultureIgnoreCase))
+        if (compare(ProtocolKey.Active))
             return Command.Active;
-        else if (command.Equals(ProtocolKey.Login, StringComparison.CurrentCultureIgnoreCase))
+        else if (compare(ProtocolKey.Login))
             return Command.Login;
-        else if (command.Equals(ProtocolKey.Message, StringComparison.CurrentCultureIgnoreCase))
+        else if (compare(ProtocolKey.Message))
             return Command.Message;
-        else if (command.Equals(ProtocolKey.Dir, StringComparison.CurrentCultureIgnoreCase))
+        else if (compare(ProtocolKey.Dir))
             return Command.Dir;
-        else if (command.Equals(ProtocolKey.FileList, StringComparison.CurrentCultureIgnoreCase))
+        else if (compare(ProtocolKey.FileList))
             return Command.FileList;
-        else if (command.Equals(ProtocolKey.Download, StringComparison.CurrentCultureIgnoreCase))
+        else if (compare(ProtocolKey.Download))
             return Command.Download;
-        else if (command.Equals(ProtocolKey.Upload, StringComparison.CurrentCultureIgnoreCase))
+        else if (compare(ProtocolKey.Upload))
             return Command.Upload;
-        else if (command.Equals(ProtocolKey.SendFile,StringComparison.CurrentCultureIgnoreCase))
+        else if (compare(ProtocolKey.SendFile))
             return Command.SendFile;
-        else if (command.Equals(ProtocolKey.Data, StringComparison.CurrentCultureIgnoreCase))
+        else if (compare(ProtocolKey.Data))
             return Command.Data;
         else
             return Command.None;
+        bool compare(string key)
+        {
+            return command.Equals(key, StringComparison.CurrentCultureIgnoreCase);
+        }
     }
+
+    private bool CheckLogin(Command command)
+    {
+        if (command is Command.Login || command is Command.Active)
+            return true;
+        else
+            return IsLogin;
+    }
+
     public bool DoSendFile()
     {
-        CommandComposer.AddSuccess();
-        return SendBackResult();
+        return CommandSucceed([]);
     }
     public bool DoData(byte[] buffer, int offset, int count)
     {            
@@ -158,7 +180,11 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         return SendBackResult();
     }
 
-    public bool DoUpload()//处理客户端文件上传
+    /// <summary>
+    /// 处理客户端文件上传
+    /// </summary>
+    /// <returns></returns>
+    public bool DoUpload()
     {
         string dirName = "";
         string fileName = "";
@@ -204,20 +230,65 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         return SendBackResult();
     }
 
-    private bool DoHandlerMessage(byte[] buffer, int offset, int count)
+    /// <summary>
+    /// 处理客户端文件下载
+    /// </summary>
+    /// <returns></returns>
+    public bool DoDownload()
+    {
+        string dirName = "";
+        string fileName = "";
+        Int64 fileSize = 0;
+        int packetSize = 0;
+        if (CommandParser.GetValue(ProtocolKey.DirName, ref dirName) & CommandParser.GetValue(ProtocolKey.FileName, ref fileName)
+            & CommandParser.GetValue(ProtocolKey.FileSize, ref fileSize) & CommandParser.GetValue(ProtocolKey.PacketSize, ref packetSize))
+        {
+            if (dirName == "")
+                dirName = RootDirectoryPath;
+            else
+                dirName = Path.Combine(RootDirectoryPath, dirName);
+            fileName = Path.Combine(dirName, fileName);
+            //ServerInstance.Logger.Info("Start download file: " + fileName);
+            if (FileStream != null) //关闭上次传输的文件
+            {
+                FileStream.Close();
+                FileStream = null;
+                FilePath = "";
+                IsSendingFile = false;
+            }
+            if (File.Exists(fileName))
+            {
+                if (!CheckFileInUse(fileName)) //检测文件是否正在使用中
+                {
+                    FilePath = fileName;
+                    FileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read);//文件以共享只读方式打开，方便多个客户端下载同一个文件。
+                    FileStream.Position = fileSize; //文件移到上次下载位置                        
+                    CommandComposer.AddSuccess();
+                    IsSendingFile = true;
+                    PacketSize = packetSize;
+                }
+                else
+                {
+                    CommandComposer.AddFailure(ProtocolCode.FileIsInUse, "");
+                    //ServerInstance.Logger.Error("Start download file error, file is in use: " + fileName);
+                }
+            }
+            else
+            {
+                CommandComposer.AddFailure(ProtocolCode.FileNotExist, "");
+            }
+        }
+        else
+            CommandComposer.AddFailure(ProtocolCode.ParameterError, "");
+        return SendBackResult();
+    }
+
+    private bool DoHandleMessage(byte[] buffer, int offset, int count)
     {
         var message = Encoding.UTF8.GetString(buffer, offset, count);
         UserToken.Server.HandleReceiveMessage(message, this);
         CommandComposer.AddSuccess();
         return SendBackResult();
-    }
-    
-    private bool CheckLogined(Command command)
-    {
-        if ((command == Command.Login) | (command == Command.Active))
-            return true;
-        else
-            return IsLogin;
     }
     public new bool DoLogin()
     {
@@ -302,55 +373,12 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         return SendBackResult();
     }
 
-    public bool DoDownload()//处理客户端文件下载
-    {
-        string dirName = "";
-        string fileName = "";
-        Int64 fileSize = 0;
-        int packetSize = 0;
-        if (CommandParser.GetValue(ProtocolKey.DirName, ref dirName) & CommandParser.GetValue(ProtocolKey.FileName, ref fileName)
-            & CommandParser.GetValue(ProtocolKey.FileSize, ref fileSize) & CommandParser.GetValue(ProtocolKey.PacketSize, ref packetSize))
-        {
-            if (dirName == "")
-                dirName = RootDirectoryPath;
-            else
-                dirName = Path.Combine(RootDirectoryPath, dirName);
-            fileName = Path.Combine(dirName, fileName);
-            //ServerInstance.Logger.Info("Start download file: " + fileName);
-            if (FileStream != null) //关闭上次传输的文件
-            {
-                FileStream.Close();
-                FileStream = null;
-                FilePath = "";
-                IsSendingFile = false;
-            }
-            if (File.Exists(fileName))
-            {
-                if (!CheckFileInUse(fileName)) //检测文件是否正在使用中
-                {
-                    FilePath = fileName;
-                    FileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read);//文件以共享只读方式打开，方便多个客户端下载同一个文件。
-                    FileStream.Position = fileSize; //文件移到上次下载位置                        
-                    CommandComposer.AddSuccess();
-                    IsSendingFile = true;
-                    PacketSize = packetSize;
-                }
-                else
-                {
-                    CommandComposer.AddFailure(ProtocolCode.FileIsInUse, "");
-                    //ServerInstance.Logger.Error("Start download file error, file is in use: " + fileName);
-                }
-            }
-            else
-            {
-                CommandComposer.AddFailure(ProtocolCode.FileNotExist, "");
-            }
-        }
-        else
-            CommandComposer.AddFailure(ProtocolCode.ParameterError, "");
-        return SendBackResult();
-    }
-    //检测文件是否正在使用中，如果正在使用中则检测是否被上传协议占用，如果占用则关闭,真表示正在使用中，并没有关闭
+    
+    /// <summary>
+    /// 检测文件是否正在使用中，如果正在使用中则检测是否被上传协议占用，如果占用则关闭,真表示正在使用中，并没有关闭
+    /// </summary>
+    /// <param name="filePath"></param>
+    /// <returns></returns>
     public bool CheckFileInUse(string filePath)
     {
         if (isFileInUse())
