@@ -187,29 +187,28 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     /// <returns></returns>
     public bool DoUpload()
     {
-        string dirName = "";
-        string fileName = "";
-        Int64 fileSize = 0;
-        int packetSize = 0;
-        if (CommandParser.GetValue(ProtocolKey.DirName, ref dirName) & CommandParser.GetValue(ProtocolKey.FileName, ref fileName) & CommandParser.GetValue(ProtocolKey.FileSize, ref fileSize) & CommandParser.GetValue(ProtocolKey.PacketSize, ref packetSize))
+        if (CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir) &
+            CommandParser.GetValueAsString(ProtocolKey.FileName, out var filePath) & 
+            CommandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize) & 
+            CommandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize))
         {
             ReceivedFileSize = fileSize;
-            if (dirName == "")
-                dirName = RootDirectoryPath;
-            fileName = Path.Combine(dirName, fileName);
-            //ServerInstance.Logger.Info("Start Receive file: " + fileName);
+            if (dir == "")
+                dir = RootDirectoryPath;
+            filePath = Path.Combine(dir, filePath);
+            //ServerInstance.Logger.Info("Start Receive file: " + filePath);
             if (FileStream != null) //关闭上次传输的文件
             {
                 FileStream.Close();
                 FileStream = null;
                 FilePath = "";
             }
-            if (File.Exists(fileName))//本地存在，则删除重建
+            if (File.Exists(filePath))//本地存在，则删除重建
             {
-                if (!CheckFileInUse(fileName)) //检测文件是否正在使用中
+                if (!CheckFileInUse(filePath)) //检测文件是否正在使用中
                 {
-                    File.Delete(fileName);
-                    FilePath = fileName;
+                    File.Delete(filePath);
+                    FilePath = filePath;
                     FileStream = new FileStream(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
                     CommandComposer.AddSuccess();
                     IsReceivingFile = true;
@@ -217,12 +216,12 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
                 else
                 {
                     CommandComposer.AddFailure(ProtocolCode.FileIsInUse, "");
-                    //ServerInstance.Logger.Error("Start Receive file error, file is in use: " + fileName);
+                    //ServerInstance.Logger.Error("Start Receive file error, file is in use: " + filePath);
                 }
             }
             else
             {
-                FilePath = fileName;
+                FilePath = filePath;
                 FileStream = new FileStream(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
                 CommandComposer.AddSuccess();
                 IsReceivingFile = true;
@@ -237,19 +236,17 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     /// <returns></returns>
     public bool DoDownload()
     {
-        string dirName = "";
-        string fileName = "";
-        Int64 fileSize = 0;
-        int packetSize = 0;
-        if (CommandParser.GetValue(ProtocolKey.DirName, ref dirName) & CommandParser.GetValue(ProtocolKey.FileName, ref fileName)
-            & CommandParser.GetValue(ProtocolKey.FileSize, ref fileSize) & CommandParser.GetValue(ProtocolKey.PacketSize, ref packetSize))
+        if (CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir) & 
+            CommandParser.GetValueAsString(ProtocolKey.FileName, out var filePath)
+            & CommandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize) & 
+            CommandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize))
         {
-            if (dirName == "")
-                dirName = RootDirectoryPath;
+            if (dir == "")
+                dir = RootDirectoryPath;
             else
-                dirName = Path.Combine(RootDirectoryPath, dirName);
-            fileName = Path.Combine(dirName, fileName);
-            //ServerInstance.Logger.Info("Start download file: " + fileName);
+                dir = Path.Combine(RootDirectoryPath, dir);
+            filePath = Path.Combine(dir, filePath);
+            //ServerInstance.Logger.Info("Start download file: " + filePath);
             if (FileStream != null) //关闭上次传输的文件
             {
                 FileStream.Close();
@@ -257,12 +254,12 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
                 FilePath = "";
                 IsSendingFile = false;
             }
-            if (File.Exists(fileName))
+            if (File.Exists(filePath))
             {
-                if (!CheckFileInUse(fileName)) //检测文件是否正在使用中
+                if (!CheckFileInUse(filePath)) //检测文件是否正在使用中
                 {
-                    FilePath = fileName;
-                    FileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read);//文件以共享只读方式打开，方便多个客户端下载同一个文件。
+                    FilePath = filePath;
+                    FileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);//文件以共享只读方式打开，方便多个客户端下载同一个文件。
                     FileStream.Position = fileSize; //文件移到上次下载位置                        
                     CommandComposer.AddSuccess();
                     IsSendingFile = true;
@@ -271,7 +268,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
                 else
                 {
                     CommandComposer.AddFailure(ProtocolCode.FileIsInUse, "");
-                    //ServerInstance.Logger.Error("Start download file error, file is in use: " + fileName);
+                    //ServerInstance.Logger.Error("Start download file error, file is in use: " + filePath);
                 }
             }
             else
@@ -293,9 +290,8 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     }
     public new bool DoLogin()
     {
-        string userID = "";
-        string password = "";
-        if (CommandParser.GetValue(ProtocolKey.UserID, ref userID) & CommandParser.GetValue(ProtocolKey.Password, ref password))
+        if (CommandParser.GetValueAsString(ProtocolKey.UserID, out var userID) & 
+            CommandParser.GetValueAsString(ProtocolKey.Password, out var password))
         {
             if (userID == "admin" && password == "password")
             {
@@ -318,16 +314,15 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     
     public bool DoDir()
     {
-        string parentDir = "";
-        if (CommandParser.GetValue(ProtocolKey.ParentDir, ref parentDir))
+        if (CommandParser.GetValueAsString(ProtocolKey.ParentDir, out var dir))
         {
-            if (parentDir == "")
-                parentDir = RootDirectoryPath;
+            if (dir == "")
+                dir = RootDirectoryPath;
             else
-                parentDir = Path.Combine(RootDirectoryPath, parentDir);
-            if (Directory.Exists(parentDir))
+                dir = Path.Combine(RootDirectoryPath, dir);
+            if (Directory.Exists(dir))
             {
-                string[] subDirectorys = Directory.GetDirectories(parentDir, "*", SearchOption.TopDirectoryOnly);
+                string[] subDirectorys = Directory.GetDirectories(dir, "*", SearchOption.TopDirectoryOnly);
                 CommandComposer.AddSuccess();
                 char[] directorySeparator = new char[1];
                 directorySeparator[0] = Path.DirectorySeparatorChar;
@@ -347,16 +342,15 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
 
     public bool DoFileList()
     {
-        string dirName = "";
-        if (CommandParser.GetValue(ProtocolKey.DirName, ref dirName))
+        if (CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir))
         {
-            if (dirName == "")
-                dirName = RootDirectoryPath;
+            if (dir == "")
+                dir = RootDirectoryPath;
             else
-                dirName = Path.Combine(RootDirectoryPath, dirName);
-            if (Directory.Exists(dirName))
+                dir = Path.Combine(RootDirectoryPath, dir);
+            if (Directory.Exists(dir))
             {
-                string[] files = Directory.GetFiles(dirName);
+                string[] files = Directory.GetFiles(dir);
                 CommandComposer.AddSuccess();
                 Int64 fileSize = 0;
                 for (int i = 0; i < files.Length; i++)

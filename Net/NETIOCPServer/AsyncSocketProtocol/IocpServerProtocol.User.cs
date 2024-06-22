@@ -19,9 +19,7 @@ partial class IocpServerProtocol
 
     public bool DoLogin()
     {
-        string userName = "";
-        string password = "";
-        if (CommandParser.GetValue(ProtocolKey.UserName, ref userName) & CommandParser.GetValue(ProtocolKey.Password, ref password))
+        if (CommandParser.GetValueAsString(ProtocolKey.UserName, out var userName) & CommandParser.GetValueAsString(ProtocolKey.Password, out var password))
         {
             if (password.Equals(BasicFunc.MD5String("admin"), StringComparison.CurrentCultureIgnoreCase))
             {

@@ -66,7 +66,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
         private bool BnetWorkOperate = false;
         public static int PacketSize = 8 * 1024;
         private string m_fileName;
-        public Int64 fileSize = 0;//文件的剩余长度
+        public Int64 FileSize = 0;//文件的剩余长度
         private Int64 receviedLength = 0;//本次文件已经接收的长度
         private string m_localFilePath;//本地保存文件的路径,不含文件名
         public string localFilePath { set { m_localFilePath = value; } get { return m_localFilePath; } }
@@ -268,7 +268,10 @@ namespace NETIOCPClient.AsyncSocketProtocol
                                         }             
                                     }
                                     else
-                                        m_incomingDataParser.GetValue(ProtocolKey.FileSize, ref fileSize);
+                                    {
+                                        m_incomingDataParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize);
+                                        FileSize = fileSize;
+                                    }
                                 }
                             }
                             else if (m_incomingDataParser.Command.Equals(ProtocolKey.Data, StringComparison.CurrentCultureIgnoreCase))
@@ -305,7 +308,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
                                         size = packetLength - offset;
                                         m_fileStream.Write(m_recvBuffer.Buffer, offset, size);
                                         receviedLength += size;
-                                        if (receviedLength >= fileSize)
+                                        if (receviedLength >= FileSize)
                                         {
                                             m_fileStream.Close();
                                             m_fileStream.Dispose();

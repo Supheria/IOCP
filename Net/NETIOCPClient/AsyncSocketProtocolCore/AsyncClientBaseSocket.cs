@@ -24,8 +24,7 @@ namespace NETIOCPClient.AsyncSocketProtocolCore
 
         public bool CheckErrorCode()
         {
-            int errorCode = 0;
-            m_incomingDataParser.GetValue(ProtocolKey.Code, ref errorCode);
+            m_incomingDataParser.GetValueAsInt(ProtocolKey.Code, out var errorCode);
             if (errorCode == ProtocolCode.Success)
                 return true;
             else
