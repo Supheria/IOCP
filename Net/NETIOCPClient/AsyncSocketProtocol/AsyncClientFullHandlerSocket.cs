@@ -1,11 +1,9 @@
 ﻿using log4net;
-using Net;
-using NETIOCPClient.AsyncSocketProtocolCore;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace NETIOCPClient.AsyncSocketProtocol
+namespace Net
 {
     public class StateObject
     {
