@@ -15,33 +15,25 @@ partial class IocpServerProtocol
 
     public string SocketFlag { get; protected set; } = "";
 
-    // TODO: refine below
-
-    public bool DoLogin()
-    {
-        if (CommandParser.GetValueAsString(ProtocolKey.UserName, out var userName) & CommandParser.GetValueAsString(ProtocolKey.Password, out var password))
-        {
-            if (password.Equals(BasicFunc.MD5String("admin"), StringComparison.CurrentCultureIgnoreCase))
-            {
-                CommandComposer.AddSuccess();
-                UserName = userName;
-                IsLogin = true;
-                //ServerInstance.Logger.InfoFormat("{0} login success", userName);
-            }
-            else
-            {
-                CommandComposer.AddFailure(ProtocolCode.UserOrPasswordError, "");
-                //ServerInstance.Logger.ErrorFormat("{0} login failure,password error", userName);
-            }
-        }
-        else
-            CommandComposer.AddFailure(ProtocolCode.ParameterError, "");
-        return SendBackResult();
-    }
+    //public virtual bool DoLogin()
+    //{
+    //    if (!CommandParser.GetValueAsString(ProtocolKey.UserName, out var userName) ||
+    //        !CommandParser.GetValueAsString(ProtocolKey.Password, out var password))
+    //        return CommandFail(ProtocolCode.ParameterError, "");
+    //    var success = password.Equals(BasicFunc.MD5String("admin"), StringComparison.CurrentCultureIgnoreCase);
+    //    if (!success)
+    //    {
+    //        return CommandFail(ProtocolCode.UserOrPasswordError, "");
+    //        //ServerInstance.Logger.ErrorFormat("{0} login failure,password error", userName);
+    //    }
+    //    UserName = userName;
+    //    IsLogin = true;
+    //    //ServerInstance.Logger.InfoFormat("{0} login success", userName);
+    //    return CommandSucceed();
+    //}
 
     public bool DoActive()
     {
-        CommandComposer.AddSuccess();
-        return SendBackResult();
+        return CommandSucceed();
     }
 }

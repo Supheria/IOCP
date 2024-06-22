@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 using System.Text;
 using Net;
 
@@ -14,7 +15,7 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
 {
     public IocpProtocolTypes Type { get; } = type;
 
-    protected IocpServer Server { get; } = server;
+    //HACK: protected IocpServer Server { get; } = server;
 
     public AsyncUserToken UserToken { get; } = userToken;
 
@@ -47,52 +48,66 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
         GC.SuppressFinalize(this);
     }
 
-    // TODO: modify all below
-
-    public virtual bool ProcessReceive(byte[] buffer, int offset, int count) //接收异步事件返回的数据，用于对数据进行缓存和分包
+    /// <summary>
+    /// 接收异步事件返回的数据，用于对数据进行缓存和分包
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="offset"></param>
+    /// <param name="count"></param>
+    /// <returns></returns>
+    public virtual bool ProcessReceive(byte[] buffer, int offset, int count)
     {
-        ActiveTime = DateTime.UtcNow;
-        DynamicBufferManager receiveBuffer = UserToken.ReceiveBuffer;
-
-        receiveBuffer.WriteBuffer(buffer, offset, count);
-        bool result = true;
-        while (receiveBuffer.DataCount > sizeof(int))
+        //HACK: ActiveTime = DateTime.UtcNow;
+        UserToken.ReceiveBuffer.WriteBuffer(buffer, offset, count);
+        while (UserToken.ReceiveBuffer.DataCount > sizeof(int))
         {
-            //按照长度分包
-            int packetLength = BitConverter.ToInt32(receiveBuffer.Buffer, 0); //获取包长度
-            if (UseNetByteOrder)
-                packetLength = System.Net.IPAddress.NetworkToHostOrder(packetLength); //把网络字节顺序转为本地字节顺序
-
-
-            if ((packetLength > 10 * 1024 * 1024) | (receiveBuffer.DataCount > 10 * 1024 * 1024)) //最大Buffer异常保护
+            // 按照长度分包
+            // 获取包长度
+            int packetLength = BitConverter.ToInt32(UserToken.ReceiveBuffer.Buffer, 0);
+            if (UseNetByteOrder) // 把网络字节顺序转为本地字节顺序
+                packetLength = IPAddress.NetworkToHostOrder(packetLength); 
+            // 最大Buffer异常保护
+            if ((packetLength > 10 * 1024 * 1024) | (UserToken.ReceiveBuffer.DataCount > 10 * 1024 * 1024))
                 return false;
-
-            if ((receiveBuffer.DataCount) >= packetLength) //收到的数据达到包长度
-            {
-                result = ProcessPacket(receiveBuffer.Buffer, sizeof(int), packetLength);
-                if (result)
-                    receiveBuffer.Clear(packetLength); //从缓存中清理
-                else
-                    return result;
-            }//未收完，继续接收
-            else
-            {
+            // 收到的数据没有达到包长度，继续接收
+            if (UserToken.ReceiveBuffer.DataCount < packetLength)
                 return true;
-            }
+            if (HandlePacket(UserToken.ReceiveBuffer.Buffer, sizeof(int), packetLength))
+                UserToken.ReceiveBuffer.Clear(packetLength); // 从缓存中清理
+            else
+                return false;
         }
         return true;
     }
 
-    public virtual bool ProcessPacket(byte[] buffer, int offset, int count) //处理分完包后的数据，把命令和数据分开，并对命令进行解析
+    /// <summary>
+    /// 处理分完包后的数据，把命令和数据分开，并对命令进行解析
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="offset"></param>
+    /// <param name="count"></param>
+    /// <returns></returns>
+    protected virtual bool HandlePacket(byte[] buffer, int offset, int count) 
     {
         if (count < sizeof(int))
             return false;
-        int commandLen = BitConverter.ToInt32(buffer, offset); //取出命令长度
-        string tmpStr = Encoding.UTF8.GetString(buffer, offset + sizeof(int), commandLen);
-        if (!CommandParser.DecodeProtocolText(tmpStr)) //解析命令
+        var length = BitConverter.ToInt32(buffer, offset); //取出命令长度
+        var command = Encoding.UTF8.GetString(buffer, offset + sizeof(int), length);
+        if (!CommandParser.DecodeProtocolText(command)) //解析命令
             return false;
+        return ProcessCommand(buffer, offset + sizeof(int) + length, count - sizeof(int) - sizeof(int) - length); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - length，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
+    }
 
-        return ProcessCommand(buffer, offset + sizeof(int) + commandLen, count - sizeof(int) - sizeof(int) - commandLen); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - commandLen，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
+    public virtual void ProcessSend()
+    {
+        //HACK: ActiveTime = DateTime.UtcNow;
+        IsSendingAsync = false;
+        UserToken.SendBuffer.ClearFirstPacket(); //清除已发送的包
+        if (UserToken.SendBuffer.GetFirstPacket(out var offset, out var count))
+        {
+            IsSendingAsync = true;
+            UserToken.SendAsync(offset, count);
+        }
     }
 
     /// <summary>
@@ -102,7 +117,7 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
     /// <param name="offset"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    public abstract bool ProcessCommand(byte[] buffer, int offset, int count);
+    protected abstract bool ProcessCommand(byte[] buffer, int offset, int count);
 
     protected bool CommandFail(int errorCode, string message)
     {
@@ -125,24 +140,12 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
         return true;
     }
 
-    public virtual void ProcessSend()
+    protected void SendBackResult()
     {
-        //HACK: ActiveTime = DateTime.UtcNow;
-        IsSendingAsync = false;
-        UserToken.SendBuffer.ClearFirstPacket(); //清除已发送的包
-        if (UserToken.SendBuffer.GetFirstPacket(out var offset, out var count))
-        {
-            IsSendingAsync = true;
-            UserToken.SendAsync(offset, count);
-        }
+        SendBackResult([], 0, 0);
     }
 
-    public bool SendBackResult()
-    {
-        return SendBackResult([], 0, 0);
-    }
-
-    public bool SendBackResult(byte[] buffer, int offset, int count)
+    protected void SendBackResult(byte[] buffer, int offset, int count)
     {
         // 获取命令
         var commandText = CommandComposer.GetProtocolText();
@@ -157,12 +160,12 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
         UserToken.SendBuffer.DynamicBufferManager.WriteBuffer(buffer, offset, count); // 写入二进制数据
         UserToken.SendBuffer.EndPacket();
         if (IsSendingAsync)
-            return true;
+            return;
         if (!UserToken.SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
-            return true;
+            return;
         IsSendingAsync = true;
         UserToken.SendAsync(packetOffset, packetCount);
-        return true;
+        return;
     }
 
     /// <summary>
@@ -171,17 +174,17 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
     /// <param name="buffer"></param>
     /// <param name="offset"></param>
     /// <param name="count"></param>
-    public bool SendBackBuffer(byte[] buffer, int offset, int count)
+    protected void SendBackBuffer(byte[] buffer, int offset, int count)
     {
         UserToken.SendBuffer.StartPacket();
         UserToken.SendBuffer.DynamicBufferManager.WriteBuffer(buffer, offset, count);
         UserToken.SendBuffer.EndPacket();
         if (IsSendingAsync)
-            return true;
+            return;
         if (!UserToken.SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
-            return true;
+            return;
         IsSendingAsync = true;
         UserToken.SendAsync(packetOffset, packetCount);
-        return true;
+        return;
     }
 }

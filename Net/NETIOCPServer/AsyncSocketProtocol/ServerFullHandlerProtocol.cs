@@ -79,7 +79,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     /// <param name="offset"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    public override bool ProcessCommand(byte[] buffer, int offset, int count)
+    protected override bool ProcessCommand(byte[] buffer, int offset, int count)
     {
         CommandComposer.Clear();
         CommandComposer.AddResponse();
@@ -172,7 +172,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
             IsReceivingFile = false;
 #if DEBUG
             // TODO: handle this event
-            Server.Tip($"文件接收成功，完成时间{DateTime.Now}", this);
+            UserToken.Server.Tip($"文件接收成功，完成时间{DateTime.Now}", this);
 #endif
         }
         CommandComposer.Clear();
@@ -201,7 +201,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         FileStream = null;
         if (File.Exists(FilePath))
         {
-            if (CheckFileInUse(FilePath))
+            if (UserToken.Server.CheckFileInUse(FilePath))
             {
                 FilePath = "";
                 return CommandFail(ProtocolCode.FileIsInUse, "");
@@ -238,7 +238,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
             FilePath = "";
             return CommandFail(ProtocolCode.FileNotExist, "");
         }
-        if (CheckFileInUse(FilePath))
+        if (UserToken.Server.CheckFileInUse(FilePath))
         {
             FilePath = "";
             //ServerInstance.Logger.Error("Start download file error, file is in use: " + filePath);
@@ -262,7 +262,8 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         return CommandSucceed();
     }
 
-    public new bool DoLogin()
+    // TODO: modify this for common-use
+    private bool DoLogin()
     {
         if (!CommandParser.GetValueAsString(ProtocolKey.UserID, out var userID) ||
             !CommandParser.GetValueAsString(ProtocolKey.Password, out var password))
@@ -283,7 +284,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
             );
     }
     
-    public bool DoDir()
+    private bool DoDir()
     {
         if (!CommandParser.GetValueAsString(ProtocolKey.ParentDir, out var dir))
             return CommandFail(ProtocolCode.ParameterError, "");
@@ -307,7 +308,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         }
     }
 
-    public bool DoFileList()
+    private bool DoFileList()
     {
         if (!CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir))
             return CommandFail(ProtocolCode.ParameterError, "");
@@ -329,52 +330,11 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
             return CommandFail(ProtocolCode.UnknowError, ex.Message);
         }
     }
-    
-    /// <summary>
-    /// 检测文件是否正在使用中，如果正在使用中则检测是否被上传协议占用，如果占用则关闭,真表示正在使用中，并没有关闭
-    /// </summary>
-    /// <param name="filePath"></param>
-    /// <returns></returns>
-    public bool CheckFileInUse(string filePath)
-    {
-        if (isFileInUse())
-        {
-            bool result = true;
-            lock (Server.ServerFullHandlerProtocolManager)
-            {
-                foreach(var fullHandler in Server.ServerFullHandlerProtocolManager)
-                {
-                    if (!filePath.Equals(fullHandler.FilePath, StringComparison.CurrentCultureIgnoreCase))
-                        continue;
-                    lock (fullHandler.UserToken) //AsyncSocketUserToken有多个线程访问
-                    {
-                        fullHandler.UserToken.Close();
-                    }
-                    result = false;
-                }
-            }
-            return result;
-        }
-        return false;
-        bool isFileInUse()
-        {
-            try
-            {
-                // 使用共享只读方式打开，可以支持多个客户端同时访问一个文件。
-                using var _ = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                return false;
-            }
-            catch
-            {
-                return true;
-            }
-        }
-    }
 
     public override void ProcessSend()
     {
         IsSendingAsync = false;
-        UserToken.SendBuffer.ClearFirstPacket(); //清除已发送的包
+        UserToken.SendBuffer.ClearFirstPacket(); // 清除已发送的包
         if (UserToken.SendBuffer.GetFirstPacket(out var offset, out var count))
         {
             IsSendingAsync = true;
