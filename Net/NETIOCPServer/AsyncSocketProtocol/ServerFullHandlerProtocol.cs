@@ -156,8 +156,12 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     {
         return CommandSucceed([]);
     }
+
     public bool DoData(byte[] buffer, int offset, int count)
-    {            
+    {
+        if (FileStream is null)
+            // TODO: ATTENTION logic is not same here
+            return CommandFail(ProtocolCode.NotOpenFile, "");
         FileStream.Write(buffer, offset, count);
         ReceviedLength += count;
         if (ReceviedLength == ReceivedFileSize)
@@ -167,17 +171,14 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
             ReceviedLength = 0;
             IsReceivingFile = false;
 #if DEBUG
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("文件接收成功，完成时间{0}", DateTime.Now);
-            Console.ForegroundColor = ConsoleColor.White;
+            // TODO: handle this event
+            Server.Tip($"文件接收成功，完成时间{DateTime.Now}", this);
 #endif
         }
         CommandComposer.Clear();
         CommandComposer.AddResponse();
         CommandComposer.AddCommand(ProtocolKey.Data);
-        CommandComposer.AddSuccess();
-        //CommandComposer.AddValue(ProtocolKey.FileSize, ReceivedFileSize - FileStream.Position);//将当前的文件流位置发给客户端
-        return SendBackResult();
+        return CommandSucceed();
     }
 
     /// <summary>
