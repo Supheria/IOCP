@@ -21,9 +21,7 @@ public class IocpServer
     /// </summary>
     public int TimeoutMilliseconds { get; }
 
-
     AsyncUserTokenPool UserTokenPool { get; }
-
 
     public AsyncUserTokenList UserTokenList { get; } = [];
 
