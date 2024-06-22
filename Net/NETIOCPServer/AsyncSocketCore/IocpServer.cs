@@ -115,7 +115,7 @@ public class IocpServer
         }
         // 使用0.0.0.0作为绑定IP，则本机所有的IPv4地址都将绑定
         var localEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), port);
-        Core = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);            
+        Core = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         Core.Bind(localEndPoint);
         Core.Listen(ParallelCountMax);
         //ServerInstance.Logger.InfoFormat("Start listen socket {0} success", localEndPoint.ToString());
@@ -193,7 +193,7 @@ public class IocpServer
     {
         if (protocol is not ServerFullHandlerProtocol fullHandler)
             return;
-        lock(ServerFullHandlerProtocolManager)
+        lock (ServerFullHandlerProtocolManager)
             ServerFullHandlerProtocolManager.Add(fullHandler);
     }
 

@@ -1,7 +1,4 @@
-﻿using Net;
-using System;
-
-namespace Net;
+﻿namespace Net;
 
 partial class IocpServerProtocol
 {
@@ -15,7 +12,7 @@ partial class IocpServerProtocol
 
     public string SocketFlag { get; protected set; } = "";
 
-    
+
     //Hack: public virtual bool DoLogin()
     //{
     //    if (!CommandParser.GetValueAsString(ProtocolKey.UserName, out var userName) ||

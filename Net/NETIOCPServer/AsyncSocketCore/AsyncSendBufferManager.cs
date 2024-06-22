@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using Net;
-
-namespace Net;
+﻿namespace Net;
 
 /// <summary>
 /// 由于是异步发送，有可能接收到两个命令，写入了两次返回，发送需要等待上一次回调才发下一次的响应

@@ -1,19 +1,14 @@
-﻿using NETIOCPClient.AsyncSocketProtocolCore;
+﻿using log4net;
 using Net;
-using System;
-using System.Collections.Generic;
-using System.IO;
+using NETIOCPClient.AsyncSocketProtocolCore;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
-using log4net;
-using Net;
 
 namespace NETIOCPClient.AsyncSocketProtocol
 {
     public class StateObject
-    {        
+    {
         public Socket workSocket = null;
     }
     public static class StaticResetevent
@@ -53,9 +48,9 @@ namespace NETIOCPClient.AsyncSocketProtocol
             {
                 uploadProcess();
             }
-        }        
+        }
     }
-    
+
     public class AsyncClientFullHandlerSocket : AsyncClientBaseSocket
     {
         private int packetLength = 0;
@@ -80,7 +75,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
         public AppHandler appHandler;//接收到消息后的处理事件
         public ILog logger;
 
-        public AsyncClientFullHandlerSocket(DownloadEvent de,UploadEvent ue)
+        public AsyncClientFullHandlerSocket(DownloadEvent de, UploadEvent ue)
             : base()
         {
             logger = Logger;//继承自父对象
@@ -222,10 +217,10 @@ namespace NETIOCPClient.AsyncSocketProtocol
                                 if (CheckErrorCode())//返回登录成功
                                 {
                                     m_userID = m_incomingDataParser.Values[1];
-                                    m_userName = m_incomingDataParser.Values[2];                                    
+                                    m_userName = m_incomingDataParser.Values[2];
                                     loginUser.Id = m_userID;
                                     loginUser.Password = Password;
-                                    loginUser.Name = m_userName;                                    
+                                    loginUser.Name = m_userName;
                                     BnetWorkOperate = true;
                                 }
                                 else
@@ -233,7 +228,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
                                     BnetWorkOperate = false;
                                 }
                                 StaticResetevent.Done.Set();//登录结束
-                            }                            
+                            }
                             else if (m_incomingDataParser.Command.Equals(ProtocolKey.Download, StringComparison.CurrentCultureIgnoreCase))
                             {
                                 if (CheckErrorCode())//文件在服务端是否在使用、是否存在
@@ -265,7 +260,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
                                                 m_readBuffer = new byte[PacketSize];
                                             int count = m_fileStream.Read(m_readBuffer, 0, PacketSize);
                                             SendCommand(m_readBuffer, 0, count);
-                                        }             
+                                        }
                                     }
                                     else
                                     {
@@ -279,13 +274,13 @@ namespace NETIOCPClient.AsyncSocketProtocol
                                 if (CheckErrorCode())
                                 {
                                     if (m_sendFile)//上传文件中
-                                    {                                        
+                                    {
                                         if (m_fileStream.Position < m_fileStream.Length) //发送具体数据
                                         {
                                             m_outgoingDataAssembler.Clear();
                                             m_outgoingDataAssembler.AddRequest();
                                             m_outgoingDataAssembler.AddCommand(ProtocolKey.Data);
-                                            
+
                                             if (m_readBuffer == null)
                                                 m_readBuffer = new byte[PacketSize];
                                             int count = m_fileStream.Read(m_readBuffer, 0, PacketSize);//读取剩余文件数据
@@ -334,14 +329,14 @@ namespace NETIOCPClient.AsyncSocketProtocol
                                 {
                                     if (m_fileStream != null)
                                     {
-                                        if (m_sendFile) 
+                                        if (m_sendFile)
                                         {
                                             m_outgoingDataAssembler.Clear();
                                             m_outgoingDataAssembler.AddRequest();
-                                            m_outgoingDataAssembler.AddCommand(ProtocolKey.SendFile);                                            
+                                            m_outgoingDataAssembler.AddCommand(ProtocolKey.SendFile);
                                             //CommandComposer.AddValue(ProtocolKey.FileSize, FileStream.Length);
-                                            SendCommand();                                            
-                                        }                                        
+                                            SendCommand();
+                                        }
                                     }
                                 }
                             }
@@ -354,7 +349,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
                             }
                         }
                         try
-                        {                            
+                        {
                             //判断client.Connected不准确，所以不要使用这个来判断连接是否正常
                             client.BeginReceive(m_recvBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);//继续等待执行接收任务，实现消息循环
                         }
@@ -394,7 +389,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
             }
         }
         public new bool DoLogin(string userID, string password)
-        {            
+        {
             try
             {
                 m_outgoingDataAssembler.Clear();

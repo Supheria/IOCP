@@ -1,5 +1,4 @@
-﻿using System.IO;
-using System.Text;
+﻿using System.Text;
 
 namespace Net
 {
@@ -70,7 +69,7 @@ namespace Net
             {
                 socket.Blocking = blockingState;
             }
-                
+
         }
     }
 }

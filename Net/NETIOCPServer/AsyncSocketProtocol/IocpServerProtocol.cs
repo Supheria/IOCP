@@ -1,7 +1,5 @@
-﻿using System;
-using System.Net;
+﻿using System.Net;
 using System.Text;
-using Net;
 
 namespace Net;
 
@@ -37,7 +35,7 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
     /// <summary>
     /// 标识是否有发送异步事件
     /// </summary>
-    protected bool IsSendingAsync { get; set; } = false; 
+    protected bool IsSendingAsync { get; set; } = false;
 
     public DateTime ConnectTime { get; } = DateTime.UtcNow;
 
@@ -65,7 +63,7 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
             // 获取包长度
             int packetLength = BitConverter.ToInt32(UserToken.ReceiveBuffer.Buffer, 0);
             if (UseNetByteOrder) // 把网络字节顺序转为本地字节顺序
-                packetLength = IPAddress.NetworkToHostOrder(packetLength); 
+                packetLength = IPAddress.NetworkToHostOrder(packetLength);
             // 最大Buffer异常保护
             if ((packetLength > 10 * 1024 * 1024) | (UserToken.ReceiveBuffer.DataCount > 10 * 1024 * 1024))
                 return false;
@@ -87,7 +85,7 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
     /// <param name="offset"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    protected virtual bool HandlePacket(byte[] buffer, int offset, int count) 
+    protected virtual bool HandlePacket(byte[] buffer, int offset, int count)
     {
         if (count < sizeof(int))
             return false;

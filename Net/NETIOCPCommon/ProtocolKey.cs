@@ -56,7 +56,7 @@ public class ProtocolKey
     public static string CyclePacket = "CyclePacket";
 
     public static string UserID = "UserID";
-    public static string UserPermissions = "UserPermissions";        
+    public static string UserPermissions = "UserPermissions";
 }
 
 public class ProtocolCode
@@ -141,7 +141,7 @@ public enum DownloadSocketCommand
     Dir = 3,
     FileList = 4,
     Download = 5,
-}    
+}
 
 public enum HandlerMessageSocketCommand
 {
