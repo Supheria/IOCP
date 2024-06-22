@@ -221,49 +221,38 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     /// <returns></returns>
     public bool DoDownload()
     {
-        if (CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir) & 
-            CommandParser.GetValueAsString(ProtocolKey.FileName, out var filePath)
-            & CommandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize) & 
-            CommandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize))
+        if (!CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir) ||
+            !CommandParser.GetValueAsString(ProtocolKey.FileName, out var filePath) ||
+            !CommandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize) ||
+            !CommandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize))
+            return CommandFail(ProtocolCode.ParameterError, "");
+        dir = dir is "" ? RootDirectoryPath : Path.Combine(RootDirectoryPath, dir);
+        if (!Directory.Exists(dir))
+            return CommandFail(ProtocolCode.DirNotExist, dir);
+        FilePath = Path.Combine(dir, filePath);
+        FileStream?.Close(); // 关闭上次传输的文件
+        FileStream = null;
+        IsSendingFile = false;
+        if (!File.Exists(FilePath))
         {
-            if (dir == "")
-                dir = RootDirectoryPath;
-            else
-                dir = Path.Combine(RootDirectoryPath, dir);
-            filePath = Path.Combine(dir, filePath);
-            //ServerInstance.Logger.Info("Start download file: " + filePath);
-            if (FileStream != null) //关闭上次传输的文件
-            {
-                FileStream.Close();
-                FileStream = null;
-                FilePath = "";
-                IsSendingFile = false;
-            }
-            if (File.Exists(filePath))
-            {
-                if (!CheckFileInUse(filePath)) //检测文件是否正在使用中
-                {
-                    FilePath = filePath;
-                    FileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);//文件以共享只读方式打开，方便多个客户端下载同一个文件。
-                    FileStream.Position = fileSize; //文件移到上次下载位置                        
-                    CommandComposer.AddSuccess();
-                    IsSendingFile = true;
-                    PacketSize = packetSize;
-                }
-                else
-                {
-                    CommandComposer.AddFailure(ProtocolCode.FileIsInUse, "");
-                    //ServerInstance.Logger.Error("Start download file error, file is in use: " + filePath);
-                }
-            }
-            else
-            {
-                CommandComposer.AddFailure(ProtocolCode.FileNotExist, "");
-            }
+            FilePath = "";
+            return CommandFail(ProtocolCode.FileNotExist, "");
         }
-        else
-            CommandComposer.AddFailure(ProtocolCode.ParameterError, "");
-        return SendBackResult();
+        if (CheckFileInUse(FilePath))
+        {
+            FilePath = "";
+            //ServerInstance.Logger.Error("Start download file error, file is in use: " + filePath);
+            return CommandFail(ProtocolCode.FileIsInUse, "");
+        }
+        // 文件以共享只读方式打开，方便多个客户端下载同一个文件。
+        FileStream = new(FilePath, FileMode.Open, FileAccess.Read, FileShare.Read)
+        {
+            Position = fileSize // 文件移到上次下载位置                        
+        };
+        IsSendingFile = true;
+        PacketSize = packetSize;
+        //ServerInstance.Logger.Info("Start download file: " + filePath);
+        return CommandSucceed();
     }
 
     private bool DoHandleMessage(byte[] buffer, int offset, int count)
