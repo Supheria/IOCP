@@ -285,60 +285,50 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     
     public bool DoDir()
     {
-        if (CommandParser.GetValueAsString(ProtocolKey.ParentDir, out var dir))
+        if (!CommandParser.GetValueAsString(ProtocolKey.ParentDir, out var dir))
+            return CommandFail(ProtocolCode.ParameterError, "");
+        if (!Directory.Exists(dir))
+            return CommandFail(ProtocolCode.DirNotExist, dir);
+        char[] directorySeparator = [Path.DirectorySeparatorChar];
+        try
         {
-            if (dir == "")
-                dir = RootDirectoryPath;
-            else
-                dir = Path.Combine(RootDirectoryPath, dir);
-            if (Directory.Exists(dir))
+            var values = new List<(string, object)>();
+            foreach (var subDir in Directory.GetDirectories(dir, "*", SearchOption.TopDirectoryOnly))
             {
-                string[] subDirectorys = Directory.GetDirectories(dir, "*", SearchOption.TopDirectoryOnly);
-                CommandComposer.AddSuccess();
-                char[] directorySeparator = new char[1];
-                directorySeparator[0] = Path.DirectorySeparatorChar;
-                for (int i = 0; i < subDirectorys.Length; i++)
-                {
-                    string[] directoryName = subDirectorys[i].Split(directorySeparator, StringSplitOptions.RemoveEmptyEntries);
-                    CommandComposer.AddValue(ProtocolKey.Item, directoryName[directoryName.Length - 1]);
-                }
+                var dirName = subDir.Split(directorySeparator, StringSplitOptions.RemoveEmptyEntries);
+                values.Add((ProtocolKey.Item, dirName[dirName.Length - 1]));
+
             }
-            else
-                CommandComposer.AddFailure(ProtocolCode.DirNotExist, "");
+            return CommandSucceed(values.ToArray());
         }
-        else
-            CommandComposer.AddFailure(ProtocolCode.ParameterError, "");
-        return SendBackResult();
+        catch (Exception ex)
+        {
+            return CommandFail(ProtocolCode.UnknowError, ex.Message);
+        }
     }
 
     public bool DoFileList()
     {
-        if (CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir))
+        if (!CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir))
+            return CommandFail(ProtocolCode.ParameterError, "");
+        dir = dir is "" ? RootDirectoryPath : Path.Combine(RootDirectoryPath, dir);
+        if (!Directory.Exists(dir))
+            return CommandFail(ProtocolCode.DirNotExist, dir);
+        try
         {
-            if (dir == "")
-                dir = RootDirectoryPath;
-            else
-                dir = Path.Combine(RootDirectoryPath, dir);
-            if (Directory.Exists(dir))
+            var values = new List<(string, object)>();
+            foreach (var file in Directory.GetFiles(dir))
             {
-                string[] files = Directory.GetFiles(dir);
-                CommandComposer.AddSuccess();
-                Int64 fileSize = 0;
-                for (int i = 0; i < files.Length; i++)
-                {
-                    FileInfo fileInfo = new FileInfo(files[i]);
-                    fileSize = fileInfo.Length;
-                    CommandComposer.AddValue(ProtocolKey.Item, fileInfo.Name + ProtocolKey.TextSeperator + fileSize.ToString());
-                }
+                var fileInfo = new FileInfo(file);
+                values.Add((ProtocolKey.Item, fileInfo.Name + ProtocolKey.TextSeperator + fileInfo.Length.ToString()));
             }
-            else
-                CommandComposer.AddFailure(ProtocolCode.DirNotExist, "");
+            return CommandSucceed(values.ToArray());
         }
-        else
-            CommandComposer.AddFailure(ProtocolCode.ParameterError, "");
-        return SendBackResult();
+        catch (Exception ex)
+        {
+            return CommandFail(ProtocolCode.UnknowError, ex.Message);
+        }
     }
-
     
     /// <summary>
     /// 检测文件是否正在使用中，如果正在使用中则检测是否被上传协议占用，如果占用则关闭,真表示正在使用中，并没有关闭
