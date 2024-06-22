@@ -60,7 +60,7 @@ namespace NETIOCPClient.AsyncSocketProtocol
     {
         private int packetLength = 0;
         private int packetReceived = 0;
-        public User loginUser = new User();
+        public UserInfo loginUser = new();
 
         private string Password = "";
         private bool BnetWorkOperate = false;
@@ -223,9 +223,9 @@ namespace NETIOCPClient.AsyncSocketProtocol
                                 {
                                     m_userID = m_incomingDataParser.Values[1];
                                     m_userName = m_incomingDataParser.Values[2];                                    
-                                    loginUser.Userid = m_userID;
+                                    loginUser.Id = m_userID;
                                     loginUser.Password = Password;
-                                    loginUser.Username = m_userName;                                    
+                                    loginUser.Name = m_userName;                                    
                                     BnetWorkOperate = true;
                                 }
                                 else

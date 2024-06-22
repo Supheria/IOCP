@@ -15,7 +15,8 @@ partial class IocpServerProtocol
 
     public string SocketFlag { get; protected set; } = "";
 
-    //public virtual bool DoLogin()
+    
+    //Hack: public virtual bool DoLogin()
     //{
     //    if (!CommandParser.GetValueAsString(ProtocolKey.UserName, out var userName) ||
     //        !CommandParser.GetValueAsString(ProtocolKey.Password, out var password))

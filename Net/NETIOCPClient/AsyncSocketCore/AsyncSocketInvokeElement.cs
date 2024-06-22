@@ -22,7 +22,7 @@ namespace NETIOCPClient.AsyncSocketCore
         {
             m_tcpClient = new AsynchronousClient();            
             m_protocolFlag = IocpProtocolTypes.None;
-            SocketTimeOutMS = ConstTabel.SocketTimeOutMS;
+            SocketTimeOutMS = ConstTabel.TimeoutMilliseconds;
             m_outgoingDataAssembler = new CommandComposer();
             m_recvBuffer = new DynamicBufferManager(ConstTabel.ReceiveBufferSize);
             m_incomingDataParser = new CommandParser();

@@ -28,7 +28,6 @@
     <Compile Update="ClientDemo\Client.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="ServerDemo\Server.cs" />
   </ItemGroup>
 
 </Project>
