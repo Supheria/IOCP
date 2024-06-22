@@ -38,12 +38,12 @@ partial class IocpServerProtocol
         }
         else
             CommandComposer.AddFailure(ProtocolCode.ParameterError, "");
-        return DoSendResult();
+        return SendBackResult();
     }
 
     public bool DoActive()
     {
         CommandComposer.AddSuccess();
-        return DoSendResult();
+        return SendBackResult();
     }
 }

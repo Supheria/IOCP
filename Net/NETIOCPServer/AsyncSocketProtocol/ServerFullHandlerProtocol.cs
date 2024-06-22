@@ -68,7 +68,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         CommandComposer.AddCommand(ProtocolKey.Message);
         CommandComposer.AddSuccess();
         byte[] Buffer = Encoding.UTF8.GetBytes(msg);
-        DoSendResult(Buffer, 0, Buffer.Length);
+        SendBackResult(Buffer, 0, Buffer.Length);
     }
     public override bool ProcessCommand(byte[] buffer, int offset, int count) //处理分完包的数据，子类从这个方法继承,服务端在此处处理所有的客户端命令请求，返回结果必须加入m_outgoingDataAssembler.AddResponse();
     {
@@ -79,7 +79,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         if (!CheckLogined(command)) //检测登录
         {
             CommandComposer.AddFailure(ProtocolCode.UserHasLogined, "");
-            return DoSendResult();
+            return SendBackResult();
         }
         if (command == Command.Login)
             return DoLogin();
@@ -132,7 +132,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     public bool DoSendFile()
     {
         CommandComposer.AddSuccess();
-        return DoSendResult();
+        return SendBackResult();
     }
     public bool DoData(byte[] buffer, int offset, int count)
     {            
@@ -155,7 +155,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         CommandComposer.AddCommand(ProtocolKey.Data);
         CommandComposer.AddSuccess();
         //CommandComposer.AddValue(ProtocolKey.FileSize, ReceivedFileSize - FileStream.Position);//将当前的文件流位置发给客户端
-        return DoSendResult();
+        return SendBackResult();
     }
 
     public bool DoUpload()//处理客户端文件上传
@@ -201,7 +201,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
                 IsReceivingFile = true;
             }
         }
-        return DoSendResult();
+        return SendBackResult();
     }
 
     private bool DoHandlerMessage(byte[] buffer, int offset, int count)
@@ -209,7 +209,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         var message = Encoding.UTF8.GetString(buffer, offset, count);
         UserToken.Server.HandleReceiveMessage(message, this);
         CommandComposer.AddSuccess();
-        return DoSendResult();
+        return SendBackResult();
     }
     
     private bool CheckLogined(Command command)
@@ -241,7 +241,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
             CommandComposer.AddFailure(ProtocolCode.ParameterError, "");
             //ServerInstance.Logger.ErrorFormat("{0} login failure,password error", userID);
         }
-        return DoSendResult();
+        return SendBackResult();
     }
     
     public bool DoDir()
@@ -270,7 +270,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         }
         else
             CommandComposer.AddFailure(ProtocolCode.ParameterError, "");
-        return DoSendResult();
+        return SendBackResult();
     }
 
     public bool DoFileList()
@@ -299,7 +299,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         }
         else
             CommandComposer.AddFailure(ProtocolCode.ParameterError, "");
-        return DoSendResult();
+        return SendBackResult();
     }
 
     public bool DoDownload()//处理客户端文件下载
@@ -348,7 +348,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         }
         else
             CommandComposer.AddFailure(ProtocolCode.ParameterError, "");
-        return DoSendResult();
+        return SendBackResult();
     }
     //检测文件是否正在使用中，如果正在使用中则检测是否被上传协议占用，如果占用则关闭,真表示正在使用中，并没有关闭
     public bool CheckFileInUse(string filePath)
@@ -387,47 +387,58 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         }
     }
 
-    public override bool SendCallback()
+    public override void ProcessSend()
     {
-        bool result = base.SendCallback();
-        if (FileStream != null)
+        IsSendingAsync = false;
+        UserToken.SendBuffer.ClearFirstPacket(); //清除已发送的包
+        if (UserToken.SendBuffer.GetFirstPacket(out var offset, out var count))
         {
-            if (IsSendingFile) //发送文件头
-            {
-                CommandComposer.Clear();
-                CommandComposer.AddResponse();
-                CommandComposer.AddCommand(ProtocolKey.SendFile);
-                CommandComposer.AddSuccess();
-                CommandComposer.AddValue(ProtocolKey.FileSize, FileStream.Length - FileStream.Position);
-                result = DoSendResult();
-                IsSendingFile = false;
-            }
-            else if (!IsReceivingFile)//没有接收文件时
-            {
-                if (FileStream.CanSeek && FileStream.Position < FileStream.Length) //发送具体数据,加m_fileStream.CanSeek是防止上传文件结束后，文件流被释放而出错
-                {
-                    CommandComposer.Clear();
-                    CommandComposer.AddResponse();
-                    CommandComposer.AddCommand(ProtocolKey.Data);
-                    CommandComposer.AddSuccess();
-                    if (ReadBuffer == null)
-                        ReadBuffer = new byte[PacketSize];
-                    else if (ReadBuffer.Length < PacketSize) //避免多次申请内存
-                        ReadBuffer = new byte[PacketSize];
-                    int count = FileStream.Read(ReadBuffer, 0, PacketSize);
-                    result = DoSendResult(ReadBuffer, 0, count);
-                }
-                else //发送完成
-                {
-                    //ServerInstance.Logger.Info("End Upload file: " + FilePath);
-                    FileStream.Close();
-                    FileStream = null;
-                    FilePath = "";
-                    IsSendingFile = false;
-                    result = true;
-                }
-            }
+            IsSendingAsync = true;
+            UserToken.SendAsync(offset, count);
         }
-        return result;
+        else
+            SendCallback();
+    }
+
+    /// <summary>
+    /// 发送回调函数，用于连续下发数据
+    /// </summary>
+    /// <returns></returns>
+    private void SendCallback()
+    {
+        if (FileStream is null)
+            return;
+        if (IsSendingFile) // 发送文件头
+        {
+            CommandComposer.Clear();
+            CommandComposer.AddResponse();
+            CommandComposer.AddCommand(ProtocolKey.SendFile);
+            _ = CommandSucceed((ProtocolKey.FileSize, FileStream.Length - FileStream.Position));
+            IsSendingFile = false;
+            return;
+        }
+        if (IsReceivingFile)
+            return;
+        // 没有接收文件时
+        // 发送具体数据,加FileStream.CanSeek是防止上传文件结束后，文件流被释放而出错
+        if (FileStream.CanSeek && FileStream.Position < FileStream.Length)
+        {
+            CommandComposer.Clear();
+            CommandComposer.AddResponse();
+            CommandComposer.AddCommand(ProtocolKey.Data);
+            ReadBuffer ??= new byte[PacketSize];
+            // 避免多次申请内存
+            if (ReadBuffer.Length < PacketSize)
+                ReadBuffer = new byte[PacketSize];
+            var count = FileStream.Read(ReadBuffer, 0, PacketSize);
+            _ = CommandSucceed(ReadBuffer, 0, count);
+            return;
+        }
+        // 发送完成
+        //ServerInstance.Logger.Info("End Upload file: " + FilePath);
+        FileStream.Close();
+        FileStream = null;
+        FilePath = "";
+        IsSendingFile = false;
     }
 }

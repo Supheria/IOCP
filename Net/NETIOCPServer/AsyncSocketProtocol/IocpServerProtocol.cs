@@ -95,104 +95,93 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
         return ProcessCommand(buffer, offset + sizeof(int) + commandLen, count - sizeof(int) - sizeof(int) - commandLen); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - commandLen，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
     }
 
-    public virtual bool ProcessCommand(byte[] buffer, int offset, int count) //处理具体命令，子类从这个方法继承，buffer是收到的数据
+    /// <summary>
+    /// 处理具体命令，子类从这个方法继承，buffer是收到的数据
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="offset"></param>
+    /// <param name="count"></param>
+    /// <returns></returns>
+    public abstract bool ProcessCommand(byte[] buffer, int offset, int count);
+
+    protected bool CommandFail(int errorCode, string message)
     {
+        CommandComposer.AddFailure(errorCode, message);
+        SendBackResult();
+        return false;
+    }
+
+    protected bool CommandSucceed(params (string Key, object value)[] addValues)
+    {
+        return CommandSucceed([], 0, 0, addValues);
+    }
+
+    protected bool CommandSucceed(byte[] buffer, int offset, int count, params (string Key, object value)[] addValues)
+    {
+        CommandComposer.AddSuccess();
+        foreach (var (key, value) in addValues)
+            CommandComposer.AddValue(key, value.ToString() ?? "");
+        SendBackResult(buffer, offset, count);
         return true;
     }
 
     public virtual void ProcessSend()
     {
-        ActiveTime = DateTime.UtcNow;
+        //HACK: ActiveTime = DateTime.UtcNow;
         IsSendingAsync = false;
-        AsyncSendBufferManager asyncSendBufferManager = UserToken.SendBuffer;
-        asyncSendBufferManager.ClearFirstPacket(); //清除已发送的包
-        int offset = 0;
-        int count = 0;
-        if (asyncSendBufferManager.GetFirstPacket(ref offset, ref count))
+        UserToken.SendBuffer.ClearFirstPacket(); //清除已发送的包
+        if (UserToken.SendBuffer.GetFirstPacket(out var offset, out var count))
         {
             IsSendingAsync = true;
-            UserToken.SendAsync(asyncSendBufferManager.DynamicBufferManager.Buffer, offset, count);
+            UserToken.SendAsync(offset, count);
         }
-        else
-            SendCallback();
     }
 
-    //发送回调函数，用于连续下发数据
-    public virtual bool SendCallback()
+    public bool SendBackResult()
     {
+        return SendBackResult([], 0, 0);
+    }
+
+    public bool SendBackResult(byte[] buffer, int offset, int count)
+    {
+        // 获取命令
+        var commandText = CommandComposer.GetProtocolText();
+        // 获取命令的字节数组
+        var bufferUTF8 = Encoding.UTF8.GetBytes(commandText);
+        // 获取总大小(4个字节的包总长度+4个字节的命令长度+命令字节数组的长度+数据的字节数组长度)
+        int totalLength = sizeof(int) + sizeof(int) + bufferUTF8.Length + count;
+        UserToken.SendBuffer.StartPacket();
+        UserToken.SendBuffer.DynamicBufferManager.WriteInt(totalLength, false); // 写入总大小
+        UserToken.SendBuffer.DynamicBufferManager.WriteInt(bufferUTF8.Length, false); // 写入命令大小
+        UserToken.SendBuffer.DynamicBufferManager.WriteBuffer(bufferUTF8); // 写入命令内容
+        UserToken.SendBuffer.DynamicBufferManager.WriteBuffer(buffer, offset, count); // 写入二进制数据
+        UserToken.SendBuffer.EndPacket();
+        if (IsSendingAsync)
+            return true;
+        if (!UserToken.SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
+            return true;
+        IsSendingAsync = true;
+        UserToken.SendAsync(packetOffset, packetCount);
         return true;
     }
 
-    public bool DoSendResult()
+    /// <summary>
+    /// 不是按包格式下发一个内存块，用于日志这类下发协议
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="offset"></param>
+    /// <param name="count"></param>
+    public bool SendBackBuffer(byte[] buffer, int offset, int count)
     {
-        string commandText = CommandComposer.GetProtocolText();
-        byte[] bufferUTF8 = Encoding.UTF8.GetBytes(commandText);
-        int totalLength = sizeof(int) + sizeof(int) + bufferUTF8.Length; //获取总大小
-        AsyncSendBufferManager asyncSendBufferManager = UserToken.SendBuffer;
-        asyncSendBufferManager.StartPacket();
-        asyncSendBufferManager.DynamicBufferManager.WriteInt(totalLength, false); //写入总大小
-        asyncSendBufferManager.DynamicBufferManager.WriteInt(bufferUTF8.Length, false); //写入命令大小
-        asyncSendBufferManager.DynamicBufferManager.WriteBuffer(bufferUTF8); //写入命令内容
-        asyncSendBufferManager.EndPacket();
-
-        bool result = true;
-        if (!IsSendingAsync)
-        {
-            int packetOffset = 0;
-            int packetCount = 0;
-            if (asyncSendBufferManager.GetFirstPacket(ref packetOffset, ref packetCount))
-            {
-                IsSendingAsync = true;
-                UserToken.SendAsync(asyncSendBufferManager.DynamicBufferManager.Buffer, packetOffset, packetCount);
-            }
-        }
-        return result;
-    }
-
-    public bool DoSendResult(byte[] buffer, int offset, int count)
-    {
-        string commandText = CommandComposer.GetProtocolText();//获取命令
-        byte[] bufferUTF8 = Encoding.UTF8.GetBytes(commandText);//获取命令的字节数组
-        int totalLength = sizeof(int) + sizeof(int) + bufferUTF8.Length + count; //获取总大小(4个字节的包总长度+4个字节的命令长度+命令字节数组的长度+数据的字节数组长度)
-        AsyncSendBufferManager asyncSendBufferManager = UserToken.SendBuffer;
-        asyncSendBufferManager.StartPacket();
-        asyncSendBufferManager.DynamicBufferManager.WriteInt(totalLength, false); //写入总大小
-        asyncSendBufferManager.DynamicBufferManager.WriteInt(bufferUTF8.Length, false); //写入命令大小
-        asyncSendBufferManager.DynamicBufferManager.WriteBuffer(bufferUTF8); //写入命令内容
-        asyncSendBufferManager.DynamicBufferManager.WriteBuffer(buffer, offset, count); //写入二进制数据
-        asyncSendBufferManager.EndPacket();
-        bool result = true;
-        if (!IsSendingAsync)
-        {
-            int packetOffset = 0;
-            int packetCount = 0;
-            if (asyncSendBufferManager.GetFirstPacket(ref packetOffset, ref packetCount))
-            {
-                IsSendingAsync = true;
-                UserToken.SendAsync(asyncSendBufferManager.DynamicBufferManager.Buffer, packetOffset, packetCount);
-            }
-        }
-        return result;
-    }
-
-    public bool DoSendBuffer(byte[] buffer, int offset, int count) //不是按包格式下发一个内存块，用于日志这类下发协议
-    {
-        AsyncSendBufferManager asyncSendBufferManager = UserToken.SendBuffer;
-        asyncSendBufferManager.StartPacket();
-        asyncSendBufferManager.DynamicBufferManager.WriteBuffer(buffer, offset, count);
-        asyncSendBufferManager.EndPacket();
-
-        bool result = true;
-        if (!IsSendingAsync)
-        {
-            int packetOffset = 0;
-            int packetCount = 0;
-            if (asyncSendBufferManager.GetFirstPacket(ref packetOffset, ref packetCount))
-            {
-                IsSendingAsync = true;
-                UserToken.SendAsync(asyncSendBufferManager.DynamicBufferManager.Buffer, packetOffset, packetCount);
-            }
-        }
-        return result;
+        UserToken.SendBuffer.StartPacket();
+        UserToken.SendBuffer.DynamicBufferManager.WriteBuffer(buffer, offset, count);
+        UserToken.SendBuffer.EndPacket();
+        if (IsSendingAsync)
+            return true;
+        if (!UserToken.SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
+            return true;
+        IsSendingAsync = true;
+        UserToken.SendAsync(packetOffset, packetCount);
+        return true;
     }
 }
