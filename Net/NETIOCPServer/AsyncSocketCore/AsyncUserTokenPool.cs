@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace Net;
+﻿namespace Net;
 
 public class AsyncUserTokenPool(int capacity)
 {

@@ -1,7 +1,5 @@
 ﻿using log4net;
-using NETIOCPClient.AsyncSocketCore;
 using Net;
-using System;
 
 namespace NETIOCPClient.AsyncSocketProtocolCore
 {
@@ -12,7 +10,7 @@ namespace NETIOCPClient.AsyncSocketProtocolCore
         public string ErrorString { get { return m_errorString; } }
         protected string m_userID;
         protected string m_userName;
-        protected string m_password; 
+        protected string m_password;
         public AsyncClientBaseSocket()
             : base()
         {
@@ -24,8 +22,7 @@ namespace NETIOCPClient.AsyncSocketProtocolCore
 
         public bool CheckErrorCode()
         {
-            int errorCode = 0;
-            m_incomingDataParser.GetValue(ProtocolKey.Code, ref errorCode);
+            m_incomingDataParser.GetValueAsInt(ProtocolKey.Code, out var errorCode);
             if (errorCode == ProtocolCode.Success)
                 return true;
             else

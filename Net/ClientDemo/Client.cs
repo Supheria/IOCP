@@ -1,9 +1,6 @@
 ﻿using NETIOCPClient;
 using NETIOCPClient.AsyncSocketProtocol;
-using System;
 using System.Collections;
-using System.IO;
-using System.Windows.Forms;
 
 
 namespace ClientDemo
@@ -16,7 +13,7 @@ namespace ClientDemo
         private DownloadEvent downLoadEvent;//下载完成事件
         private UploadEvent uploadEvent;//上传完成事件
         private bool stop = false;
-       
+
         public Hashtable elementHashtable = new Hashtable();
         private int number = 0;
 
@@ -26,10 +23,10 @@ namespace ClientDemo
             downLoadEvent = new DownloadEvent();
             downLoadEvent.downLoadProcess += new DownloadEvent.DownLoadProcess(downLoadEvent_downLoadProcess);
             uploadEvent = new UploadEvent();
-            uploadEvent.uploadProcess += new UploadEvent.UploadProcess(uploadEvent_uploadProcess);                   
+            uploadEvent.uploadProcess += new UploadEvent.UploadProcess(uploadEvent_uploadProcess);
         }
 
-       
+
 
         void uploadEvent_uploadProcess()
         {
@@ -43,17 +40,17 @@ namespace ClientDemo
 
         private void button_connect_Click(object sender, EventArgs e)
         {
-            ClientFullHandlerSocket_MSG = new AsyncClientFullHandlerSocket(null,null);//消息发送不需要挂接事件
+            ClientFullHandlerSocket_MSG = new AsyncClientFullHandlerSocket(null, null);//消息发送不需要挂接事件
             //ClientFullHandlerSocket_MSG.SetNoDelay(true);
             try
-            {               
+            {
                 ClientFullHandlerSocket_MSG.Connect(textBox_IP.Text, Convert.ToInt32(textBox_Port.Text));//增强实时性，使用无延迟发送
                 ClientFullHandlerSocket_MSG.localFilePath = @"d:\temp";
                 ClientFullHandlerSocket_MSG.appHandler = new AppHandler();
                 ClientFullHandlerSocket_MSG.appHandler.OnReceivedMsg += new AppHandler.HandlerReceivedMsg(appHandler_OnReceivedMsg);//接收到消息后处理事件
                 ClientFullHandlerSocket_MSG.ReceiveMessageHead();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
                 ClientFullHandlerSocket_MSG.logger.Info("Connect failed");
@@ -71,15 +68,15 @@ namespace ClientDemo
                 MessageBox.Show("Login failed");
                 ClientFullHandlerSocket_MSG.logger.Info("Login failed");
             }
-        }        
+        }
 
         private void button_sendMsg_Click(object sender, EventArgs e)
-        {            
+        {
             try
             {
                 ClientFullHandlerSocket_MSG.SendMessageQuick(textBox_msg.Text);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
             }
@@ -91,7 +88,7 @@ namespace ClientDemo
             if (msg.Contains("result"))
             {
 #if DEBUG                
-                Console.WriteLine(msg);                
+                Console.WriteLine(msg);
 #endif
             }
 
@@ -111,17 +108,17 @@ namespace ClientDemo
                 ClientFullHandlerSocket_UPLOAD.localFilePath = @"d:\temp";
                 ClientFullHandlerSocket_UPLOAD.ReceiveMessageHead();
                 ClientFullHandlerSocket_UPLOAD.DoLogin("admin", "password");
-            }            
+            }
             ClientFullHandlerSocket_UPLOAD.DoUpload(fileFullPath, "", new FileInfo(fileFullPath).Name);
         }
 
-        
 
-       
+
+
 
         private void button_fileSelect_Click(object sender, EventArgs e)
         {
-            OpenFileDialog ofd = new OpenFileDialog();            
+            OpenFileDialog ofd = new OpenFileDialog();
             ofd.Title = "选择要发送的文件";
             ofd.Filter = "所有文件(*.*)|*.*";
             if (ofd.ShowDialog() == System.Windows.Forms.DialogResult.OK)
@@ -133,7 +130,7 @@ namespace ClientDemo
         private void button_download_Click(object sender, EventArgs e)
         {
             DownLoad(textBox_remoteFilePath.Text);
-            
+
         }
         private void DownLoad(string remoteFileFullPath)//使用单独Socket来下载文件
         {
@@ -149,9 +146,9 @@ namespace ClientDemo
             ClientFullHandlerSoclet_DOWNLOAD.DoDownload(fi.DirectoryName, fi.Name, fi.DirectoryName.Substring(fi.DirectoryName.LastIndexOf("\\", StringComparison.Ordinal)));
         }
 
-       
-       
-        
+
+
+
     }
-    
+
 }

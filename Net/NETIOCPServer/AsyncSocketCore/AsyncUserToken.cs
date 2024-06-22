@@ -1,6 +1,4 @@
-﻿using Net;
-using System;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Net.Sockets;
 
 
@@ -158,11 +156,11 @@ public class AsyncUserToken
         return false;
     }
 
-    public void SendAsync(byte[] buffer, int offset, int count)
+    public void SendAsync(int offset, int count)
     {
         if (AcceptSocket is null)
             return;
-        SendAsyncArgs.SetBuffer(buffer, offset, count);
+        SendAsyncArgs.SetBuffer(SendBuffer.DynamicBufferManager.Buffer, offset, count);
         if (!AcceptSocket.SendAsync(SendAsyncArgs))
             new Task(() => ProcessSend()).Start();
     }

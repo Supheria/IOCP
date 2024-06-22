@@ -21,9 +21,7 @@ public class IocpServer
     /// </summary>
     public int TimeoutMilliseconds { get; }
 
-
     AsyncUserTokenPool UserTokenPool { get; }
-
 
     public AsyncUserTokenList UserTokenList { get; } = [];
 
@@ -115,7 +113,7 @@ public class IocpServer
         }
         // 使用0.0.0.0作为绑定IP，则本机所有的IPv4地址都将绑定
         var localEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), port);
-        Core = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);            
+        Core = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         Core.Bind(localEndPoint);
         Core.Listen(ParallelCountMax);
         //ServerInstance.Logger.InfoFormat("Start listen socket {0} success", localEndPoint.ToString());
@@ -193,7 +191,7 @@ public class IocpServer
     {
         if (protocol is not ServerFullHandlerProtocol fullHandler)
             return;
-        lock(ServerFullHandlerProtocolManager)
+        lock (ServerFullHandlerProtocolManager)
             ServerFullHandlerProtocolManager.Add(fullHandler);
     }
 
@@ -203,5 +201,56 @@ public class IocpServer
             return;
         lock (ServerFullHandlerProtocolManager)
             ServerFullHandlerProtocolManager.Remove(fullHandler);
+    }
+
+    /// <summary>
+    /// 检测文件是否正在使用中，如果正在使用中则检测是否被上传协议占用，如果占用则关闭,真表示正在使用中，并没有关闭
+    /// </summary>
+    /// <param name="filePath"></param>
+    /// <returns></returns>
+    public bool CheckFileInUse(string filePath)
+    {
+        if (isFileInUse())
+        {
+            bool result = true;
+            lock (ServerFullHandlerProtocolManager)
+            {
+                foreach (var fullHandler in ServerFullHandlerProtocolManager)
+                {
+                    if (!filePath.Equals(fullHandler.FilePath, StringComparison.CurrentCultureIgnoreCase))
+                        continue;
+                    lock (fullHandler.UserToken) // AsyncSocketUserToken有多个线程访问
+                    {
+                        fullHandler.UserToken.Close();
+                    }
+                    result = false;
+                }
+            }
+            return result;
+        }
+        return false;
+        bool isFileInUse()
+        {
+            try
+            {
+                // 使用共享只读方式打开，可以支持多个客户端同时访问一个文件。
+                using var _ = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                return false;
+            }
+            catch
+            {
+                return true;
+            }
+        }
+    }
+
+    // TODO: make this reuseable
+    public delegate void HandleTip(string tip, ServerFullHandlerProtocol fullHandler);
+
+    public event HandleTip? OnTip;
+
+    public void Tip(string tip, ServerFullHandlerProtocol fullHandler)
+    {
+        OnTip?.Invoke(tip, fullHandler);
     }
 }

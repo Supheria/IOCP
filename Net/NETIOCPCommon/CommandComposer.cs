@@ -1,90 +1,87 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Text;
 
-namespace Net
+namespace Net;
+
+public class CommandComposer
 {
-    public class CommandComposer
+    List<string> ProtocolText { get; } = [];
+
+    public void Clear()
     {
-        private List<string> m_protocolText;
+        ProtocolText.Clear();
+    }
 
-        public CommandComposer()
-        {
-            m_protocolText = new List<string>();
-        }
+    public string GetProtocolText()
+    {
+        var str = new StringBuilder();
+        if (ProtocolText.Count > 0)
+            str.AppendJoin(ProtocolKey.ReturnWrap, ProtocolText);
+        return str.ToString();
+    }
 
-        public void Clear()
-        {
-            m_protocolText.Clear();
-        }
+    public void AddRequest()
+    {
+        var str = new StringBuilder()
+            .Append(ProtocolKey.LeftBrackets)
+            .Append(ProtocolKey.Request)
+            .Append(ProtocolKey.RightBrackets)
+            .ToString();
+        ProtocolText.Add(str);
+    }
 
-        public string GetProtocolText()
-        {
-            string tmpStr = "";
-            if (m_protocolText.Count > 0)
-            {
-                tmpStr = m_protocolText[0];
-                for (int i = 1; i < m_protocolText.Count; i++)
-                {
-                    tmpStr = tmpStr + ProtocolKey.ReturnWrap + m_protocolText[i];
-                }
-            }
-            return tmpStr;
-        }
+    public void AddResponse()
+    {
+        var str = new StringBuilder()
+            .Append(ProtocolKey.LeftBrackets)
+            .Append(ProtocolKey.Response)
+            .Append(ProtocolKey.RightBrackets)
+            .ToString();
+        ProtocolText.Add(str);
+    }
 
-        public void AddRequest()
-        {
-            m_protocolText.Add(ProtocolKey.LeftBrackets + ProtocolKey.Request + ProtocolKey.RightBrackets);
-        }
+    public void AddCommand(string commandKey)
+    {
+        var str = new StringBuilder()
+            .Append(ProtocolKey.Command)
+            .Append(ProtocolKey.EqualSign)
+            .Append(commandKey)
+            .ToString();
+        ProtocolText.Add(str);
+    }
 
-        public void AddResponse()
-        {
-            m_protocolText.Add(ProtocolKey.LeftBrackets + ProtocolKey.Response + ProtocolKey.RightBrackets);
-        }
+    public void AddSuccess()
+    {
+        var str = new StringBuilder()
+            .Append(ProtocolKey.Code)
+            .Append(ProtocolKey.EqualSign)
+            .Append(ProtocolCode.Success)
+            .ToString();
+        ProtocolText.Add(str);
+    }
 
-        public void AddCommand(string commandKey)
-        {
-            m_protocolText.Add(ProtocolKey.Command + ProtocolKey.EqualSign + commandKey);
-        }
+    public void AddFailure(int errorCode, string message)
+    {
+        var str = new StringBuilder()
+            .Append(ProtocolKey.Code)
+            .Append(ProtocolKey.EqualSign)
+            .Append(errorCode)
+            .ToString();
+        ProtocolText.Add(str);
+        str = new StringBuilder()
+            .Append(ProtocolKey.Message)
+            .Append(ProtocolKey.EqualSign)
+            .Append(message)
+            .ToString();
+        ProtocolText.Add(str);
+    }
 
-        public void AddSuccess()
-        {
-            m_protocolText.Add(ProtocolKey.Code + ProtocolKey.EqualSign + ProtocolCode.Success.ToString());
-        }
-
-        public void AddFailure(int errorCode, string message)
-        {
-            m_protocolText.Add(ProtocolKey.Code + ProtocolKey.EqualSign + errorCode.ToString());
-            m_protocolText.Add(ProtocolKey.Message + ProtocolKey.EqualSign + message);
-        }
-
-        public void AddValue(string protocolKey, string value)
-        {
-            m_protocolText.Add(protocolKey + ProtocolKey.EqualSign + value);
-        }
-
-        public void AddValue(string protocolKey, short value)
-        {
-            m_protocolText.Add(protocolKey + ProtocolKey.EqualSign + value.ToString());
-        }
-
-        public void AddValue(string protocolKey, int value)
-        {
-            m_protocolText.Add(protocolKey + ProtocolKey.EqualSign + value.ToString());
-        }
-
-        public void AddValue(string protocolKey, long value)
-        {
-            m_protocolText.Add(protocolKey + ProtocolKey.EqualSign + value.ToString());
-        }
-
-        public void AddValue(string protocolKey, Single value)
-        {
-            m_protocolText.Add(protocolKey + ProtocolKey.EqualSign + value.ToString());
-        }
-
-        public void AddValue(string protocolKey, double value)
-        {
-            m_protocolText.Add(protocolKey + ProtocolKey.EqualSign + value.ToString());
-        }
+    public void AddValue(string protocolKey, object value)
+    {
+        var str = new StringBuilder()
+            .Append(protocolKey)
+            .Append(ProtocolKey.EqualSign)
+            .Append(value.ToString())
+            .ToString();
+        ProtocolText.Add(str);
     }
 }

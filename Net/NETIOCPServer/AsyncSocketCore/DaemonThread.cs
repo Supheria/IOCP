@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading;
-
-namespace Net;
+﻿namespace Net;
 
 class DaemonThread
 {
