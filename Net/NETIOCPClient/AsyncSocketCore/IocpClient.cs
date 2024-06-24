@@ -31,6 +31,14 @@ public class IocpClient
     //    }
     //}
 
+    public delegate void HandleMessage(string message);
+    public event HandleMessage? OnReceiveMessage;
+
+    public void HandleReceiveMessage(string message)
+    {
+        new Task(() => OnReceiveMessage?.Invoke(message)).Start();
+    }
+
     public bool Connect(string host, int port)
     {
         bool result = false;

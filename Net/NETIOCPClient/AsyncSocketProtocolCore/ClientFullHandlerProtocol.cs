@@ -114,12 +114,7 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
     /// </summary>
     UploadEvent? UploadEvent { get; } = uploadEvent;
 
-    /// <summary>
-    /// //接收到消息后的处理事件
-    /// </summary>
-    public AppHandler AppHandler { get; set; } = new();
-
-    // HACK: public void SendMessage(string msg)
+    // HACK: public void SendMessage(string message)
     //{
     //    bool bConnect = ReConnectAndLogin(); //检测连接是否还在，如果断开则重连并登录
     //    if (!bConnect)
@@ -132,7 +127,7 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
     //        CommandComposer.Clear();
     //        CommandComposer.AddRequest();
     //        CommandComposer.AddCommand(ProtocolKey.Message);
-    //        byte[] bufferMsg = Encoding.UTF8.GetBytes(msg);
+    //        byte[] bufferMsg = Encoding.UTF8.GetBytes(message);
     //        SendCommand(bufferMsg, 0, bufferMsg.Length);
     //    }
     //}
@@ -303,18 +298,15 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
     {
         //HACK: int offset = commandLen + sizeof(int) + sizeof(int);//前8个字节为包长度+命令长度
         //HACK: size = PacketLength - offset;
-        string msg = Encoding.UTF8.GetString(buffer, offset, count);
+        string message = Encoding.UTF8.GetString(buffer, offset, count);
 #if DEBUG
-        if (msg != string.Empty)
-            Console.WriteLine("Message Recevied from Server: " + msg);
+        if (message != string.Empty)
+            Console.WriteLine("Message Recevied from Server: " + message);
 #endif
         //DoHandleMessage
-        if (!string.IsNullOrWhiteSpace(msg))
+        if (!string.IsNullOrWhiteSpace(message))
         {
-            if (AppHandler != null)
-            {
-                AppHandler.HandlerMsg(msg);//将业务逻辑引出到框架外部
-            }
+            Client.HandleReceiveMessage(message);
         }
     }
 

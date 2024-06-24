@@ -45,8 +45,7 @@ namespace ClientDemo
             {
                 ClientFullHandlerSocket_MSG.Connect(textBox_IP.Text, Convert.ToInt32(textBox_Port.Text));//增强实时性，使用无延迟发送
                 ClientFullHandlerSocket_MSG.LocalFilePath = @"d:\temp";
-                ClientFullHandlerSocket_MSG.AppHandler = new AppHandler();
-                ClientFullHandlerSocket_MSG.AppHandler.OnReceivedMsg += new AppHandler.HandlerReceivedMsg(appHandler_OnReceivedMsg);//接收到消息后处理事件
+                ClientFullHandlerSocket_MSG.Client.OnReceiveMessage += appHandler_OnReceivedMsg;//接收到消息后处理事件
                 ClientFullHandlerSocket_MSG.ReceiveMessageHead();
             }
             catch (Exception ex)

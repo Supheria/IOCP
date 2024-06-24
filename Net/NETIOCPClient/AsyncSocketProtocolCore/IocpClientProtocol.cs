@@ -5,7 +5,7 @@ namespace Net;
 
 public abstract partial class IocpClientProtocol(IocpProtocolTypes type)
 {
-    protected IocpClient Client { get; } = new();
+    public IocpClient Client { get; } = new();
 
     protected string Host { get; private set; } = "";
 
