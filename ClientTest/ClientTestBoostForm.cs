@@ -37,7 +37,7 @@ public class ClientTestBoostForm : ResizeableForm
             ]);
         OnDrawingClient += DrawClient;
         SwitchButton.Click += Start_Click;
-        Timer.Interval = 300;
+        Timer.Interval = 100;
         Timer.Elapsed += (_, _) => Test();
     }
 
