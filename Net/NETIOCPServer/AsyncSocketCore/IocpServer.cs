@@ -184,7 +184,7 @@ public class IocpServer
 
     public void HandleReceiveMessage(string message, ServerFullHandlerProtocol fullHandler)
     {
-        OnReceiveMessage?.Invoke(message, fullHandler);
+        new Task(() => OnReceiveMessage?.Invoke(message, fullHandler)).Start();
     }
 
     public void AddProtocol(IocpServerProtocol? protocol)
@@ -251,6 +251,6 @@ public class IocpServer
 
     public void Tip(string tip, ServerFullHandlerProtocol fullHandler)
     {
-        OnTip?.Invoke(tip, fullHandler);
+        new Task(() => OnTip?.Invoke(tip, fullHandler)).Start();
     }
 }

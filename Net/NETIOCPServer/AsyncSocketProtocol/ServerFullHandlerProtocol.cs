@@ -254,6 +254,10 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     {
         var message = Encoding.UTF8.GetString(buffer, offset, count);
         UserToken.Server.HandleReceiveMessage(message, this);
+        // TODO: for test
+#if DEBUG
+        SendMessage("result: received");
+#endif
         return CommandSucceed();
     }
 
