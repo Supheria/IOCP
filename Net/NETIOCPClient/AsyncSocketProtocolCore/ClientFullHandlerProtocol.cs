@@ -1,6 +1,8 @@
 ﻿using log4net;
+using System.Drawing;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Policy;
 using System.Text;
 
 namespace Net;
@@ -51,6 +53,20 @@ public class UploadEvent
 
 public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent uploadEvent) : IocpClientProtocol(IocpProtocolTypes.FullHandler)
 {
+    enum Command
+    {
+        None = 0,
+        Login = 1,
+        Active = 2,
+        Dir = 3,
+        FileList = 4,
+        Download = 5,
+        Data = 6,
+        Message = 7,
+        Upload = 8,
+        SendFile = 9
+    }
+
     int PacketLength { get; set; } = 0;
 
     int PacketReceived { get; set; } = 0;
@@ -189,6 +205,249 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
         }
     }
 
+    private void ProcessCommand(byte[] buffer, int offset, int count)
+    {
+        ////CommandComposer.Clear();
+        ////CommandComposer.AddResponse();
+        ////CommandComposer.AddCommand(CommandParser.Command);
+        var command = StrToCommand(CommandParser.Command);
+        //if (!CheckLogin(command)) //检测登录
+        //    return CommandFail(ProtocolCode.UserHasLogined, "");
+        switch (command)
+        {
+            //Command.Login => DoLogin(),
+            //Command.Active => Active(),
+            //Command.Message => DoHandleMessage(buffer, offset, count),
+            //Command.Dir => DoDir(),
+            //Command.FileList => DoFileList(),
+            //Command.Download => DoDownload(),
+            //Command.Upload => DoUpload(),
+            //Command.SendFile => DoSendFile(),
+            //Command.Data => DoData(buffer, offset, count),
+            case Command.Active:
+                DoActive();
+                break;
+            case Command.Message:
+                DoMessage(buffer, offset, count);
+                break;
+            case Command.Login:
+                DoLogin();
+                break;
+            case Command.Download:
+                DoDownload();
+                break;
+            case Command.SendFile:
+                DoSendFile();
+                break;
+            case Command.Data:
+                DoData(buffer, offset, count);
+                break;
+            case Command.Upload:
+                DoUpload();
+                break;
+            default:
+                return;
+        };
+    }
+
+    private static Command StrToCommand(string command)
+    {
+        if (compare(ProtocolKey.Active))
+            return Command.Active;
+        else if (compare(ProtocolKey.Login))
+            return Command.Login;
+        else if (compare(ProtocolKey.Message))
+            return Command.Message;
+        else if (compare(ProtocolKey.Dir))
+            return Command.Dir;
+        else if (compare(ProtocolKey.FileList))
+            return Command.FileList;
+        else if (compare(ProtocolKey.Download))
+            return Command.Download;
+        else if (compare(ProtocolKey.Upload))
+            return Command.Upload;
+        else if (compare(ProtocolKey.SendFile))
+            return Command.SendFile;
+        else if (compare(ProtocolKey.Data))
+            return Command.Data;
+        else
+            return Command.None;
+        bool compare(string key)
+        {
+            return command.Equals(key, StringComparison.CurrentCultureIgnoreCase);
+        }
+    }
+
+    private void HandlePacket(byte[] buffer, int offset, int count)
+    {
+        if (count < sizeof(int))
+            return;
+        var commandLength = BitConverter.ToInt32(buffer, offset); //取出命令长度
+        var command = Encoding.UTF8.GetString(buffer, offset + sizeof(int), commandLength);
+        if (!CommandParser.DecodeProtocolText(command)) //解析命令
+            return;
+        ProcessCommand(buffer, offset + sizeof(int) + commandLength, count - sizeof(int) - sizeof(int) - commandLength); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - commandLength，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
+    }
+
+    private void DoActive()
+    {
+        if (CheckErrorCode())
+        {
+            BnetWorkOperate = true;
+        }
+        else
+            BnetWorkOperate = false;
+    }
+
+    private void DoMessage(byte[] buffer, int offset, int count)
+    {
+        //HACK: int offset = commandLen + sizeof(int) + sizeof(int);//前8个字节为包长度+命令长度
+        //HACK: size = PacketLength - offset;
+        string msg = Encoding.UTF8.GetString(buffer, offset, count);
+#if DEBUG
+        if (msg != string.Empty)
+            Console.WriteLine("Message Recevied from Server: " + msg);
+#endif
+        //DoHandleMessage
+        if (!string.IsNullOrWhiteSpace(msg))
+        {
+            if (AppHandler != null)
+            {
+                AppHandler.HandlerMsg(msg);//将业务逻辑引出到框架外部
+            }
+        }
+    }
+
+    private void DoLogin()
+    {
+        if (CheckErrorCode())//返回登录成功
+        {
+            UserID = CommandParser.Values[1];
+            UserName = CommandParser.Values[2];
+            LoginUser.Id = UserID;
+            LoginUser.Password = Password;
+            LoginUser.Name = UserName;
+            BnetWorkOperate = true;
+        }
+        else
+        {
+            BnetWorkOperate = false;
+        }
+        StaticResetevent.Done.Set();//登录结束
+    }
+
+    private void DoDownload()
+    {
+        if (CheckErrorCode())//文件在服务端是否在使用、是否存在
+        {
+            if (!File.Exists(FilePath))//本地不存在，则创建
+            {
+                string dir = FilePath.Substring(0, FilePath.LastIndexOf("\\"));
+                if (!Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+                FileStream = new FileStream(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            }
+        }
+    }
+
+    private void DoSendFile()
+    {
+        if (CheckErrorCode())
+        {
+            if (IsSendingFile)//上传文件中
+            {
+                if (FileStream.Position < FileStream.Length) //发送具体数据
+                {
+                    CommandComposer.Clear();
+                    CommandComposer.AddRequest();
+                    CommandComposer.AddCommand(ProtocolKey.Data);
+
+                    if (ReadBuffer == null)
+                        ReadBuffer = new byte[PacketSize];
+                    int count = FileStream.Read(ReadBuffer, 0, PacketSize);
+                    SendCommand(ReadBuffer, 0, count);
+                }
+            }
+            else
+            {
+                CommandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize);
+                FileSize = fileSize;
+            }
+        }
+    }
+
+    private void DoData(byte[] buffer, int offset, int count)
+    {
+        if (CheckErrorCode())
+        {
+            if (IsSendingFile)//上传文件中
+            {
+                if (FileStream.Position < FileStream.Length) //发送具体数据
+                {
+                    CommandComposer.Clear();
+                    CommandComposer.AddRequest();
+                    CommandComposer.AddCommand(ProtocolKey.Data);
+
+                    if (ReadBuffer == null)
+                        ReadBuffer = new byte[PacketSize];
+                    int size = FileStream.Read(ReadBuffer, 0, PacketSize);//读取剩余文件数据
+                    SendCommand(ReadBuffer, 0, size);
+                }
+                else //发送文件数据结束
+                {
+                    IsSendingFile = false;
+                    StaticResetevent.Done.Set();//上传结束 
+                    PacketSize = PacketSize / 8;//文件传输时将包大小放大8倍,传输完成后还原为原来大小
+                    UploadEvent.OnProcessUpload();
+                }
+            }
+            else//下载文件
+            {
+                if (FileStream == null)
+                    FileStream = new FileStream(FilePath, FileMode.Open, FileAccess.ReadWrite);
+                FileStream.Position = FileStream.Length; //文件移到末尾                            
+                //HACK: int offset = commandLen + sizeof(int) + sizeof(int);//前8个字节为包长度+命令长度
+                //HACK: size = PacketLength - offset;
+                FileStream.Write(buffer, offset, count);
+                ReceviedLength += count;
+                if (ReceviedLength >= FileSize)
+                {
+                    FileStream.Close();
+                    FileStream.Dispose();
+                    ReceviedLength = 0;
+#if DEBUG
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("文件下载成功，完成时间{0}", DateTime.Now);
+                    Console.ForegroundColor = ConsoleColor.White;
+#endif
+
+                    StaticResetevent.Done.Set();//下载完成
+                    if (DownloadEvent != null)
+                    {
+                        DownloadEvent.OnProcessDownLoad();
+                    }
+                }
+            }
+        }
+    }
+
+    private void DoUpload()
+    {
+        if (FileStream != null)
+        {
+            if (IsSendingFile)
+            {
+                CommandComposer.Clear();
+                CommandComposer.AddRequest();
+                CommandComposer.AddCommand(ProtocolKey.SendFile);
+                //CommandComposer.AddValue(ProtocolKey.FileSize, FileStream.Length);
+                SendCommand();
+            }
+        }
+    }
+
     private void ReceiveMessageDataCallback(IAsyncResult ar)
     {
         try
@@ -220,174 +479,11 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
                 }
             }
             PacketReceived = 0;
-            int size = 0;
+            //HACK: int size = 0;
             int commandLen = BitConverter.ToInt32(ReceiveBuffer.Buffer, sizeof(int)); //取出命令长度
             string tmpStr = Encoding.UTF8.GetString(ReceiveBuffer.Buffer, sizeof(int) + sizeof(int), commandLen);
-            if (CommandParser.DecodeProtocolText(tmpStr)) //解析命令，命令（除Message）完成后，必须要使用StaticResetevent这个静态信号量，保证同一时刻只有一个命令在执行
-            {
-                if (CommandParser.Command.Equals(ProtocolKey.Active, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    if (CheckErrorCode())
-                    {
-                        BnetWorkOperate = true;
-                    }
-                    else
-                        BnetWorkOperate = false;
-                }
-                else if (CommandParser.Command.Equals(ProtocolKey.Message, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    int offset = commandLen + sizeof(int) + sizeof(int);//前8个字节为包长度+命令长度
-                    size = PacketLength - offset;
-                    string msg = Encoding.UTF8.GetString(ReceiveBuffer.Buffer, offset, size);
-#if DEBUG
-                    if (msg != string.Empty)
-                        Console.WriteLine("Message Recevied from Server: " + msg);
-#endif
-                    //DoHandleMessage
-                    if (!string.IsNullOrWhiteSpace(msg))
-                    {
-                        if (AppHandler != null)
-                        {
-                            AppHandler.HandlerMsg(msg);//将业务逻辑引出到框架外部
-                        }
-                    }
-                }
-                else if (CommandParser.Command.Equals(ProtocolKey.Login, StringComparison.CurrentCultureIgnoreCase))//登录信息返回
-                {
-                    if (CheckErrorCode())//返回登录成功
-                    {
-                        UserID = CommandParser.Values[1];
-                        UserName = CommandParser.Values[2];
-                        LoginUser.Id = UserID;
-                        LoginUser.Password = Password;
-                        LoginUser.Name = UserName;
-                        BnetWorkOperate = true;
-                    }
-                    else
-                    {
-                        BnetWorkOperate = false;
-                    }
-                    StaticResetevent.Done.Set();//登录结束
-                }
-                else if (CommandParser.Command.Equals(ProtocolKey.Download, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    if (CheckErrorCode())//文件在服务端是否在使用、是否存在
-                    {
-                        if (!File.Exists(FilePath))//本地不存在，则创建
-                        {
-                            string dir = FilePath.Substring(0, FilePath.LastIndexOf("\\"));
-                            if (!Directory.Exists(dir))
-                            {
-                                Directory.CreateDirectory(dir);
-                            }
-                            FileStream = new FileStream(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-                        }
-                    }
-                }
-                else if (CommandParser.Command.Equals(ProtocolKey.SendFile, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    if (CheckErrorCode())
-                    {
-                        if (IsSendingFile)//上传文件中
-                        {
-                            if (FileStream.Position < FileStream.Length) //发送具体数据
-                            {
-                                CommandComposer.Clear();
-                                CommandComposer.AddRequest();
-                                CommandComposer.AddCommand(ProtocolKey.Data);
-
-                                if (ReadBuffer == null)
-                                    ReadBuffer = new byte[PacketSize];
-                                int count = FileStream.Read(ReadBuffer, 0, PacketSize);
-                                SendCommand(ReadBuffer, 0, count);
-                            }
-                        }
-                        else
-                        {
-                            CommandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize);
-                            FileSize = fileSize;
-                        }
-                    }
-                }
-                else if (CommandParser.Command.Equals(ProtocolKey.Data, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    if (CheckErrorCode())
-                    {
-                        if (IsSendingFile)//上传文件中
-                        {
-                            if (FileStream.Position < FileStream.Length) //发送具体数据
-                            {
-                                CommandComposer.Clear();
-                                CommandComposer.AddRequest();
-                                CommandComposer.AddCommand(ProtocolKey.Data);
-
-                                if (ReadBuffer == null)
-                                    ReadBuffer = new byte[PacketSize];
-                                int count = FileStream.Read(ReadBuffer, 0, PacketSize);//读取剩余文件数据
-                                SendCommand(ReadBuffer, 0, count);
-                            }
-                            else //发送文件数据结束
-                            {
-                                IsSendingFile = false;
-                                StaticResetevent.Done.Set();//上传结束 
-                                PacketSize = PacketSize / 8;//文件传输时将包大小放大8倍,传输完成后还原为原来大小
-                                UploadEvent.OnProcessUpload();
-                            }
-                        }
-                        else//下载文件
-                        {
-                            if (FileStream == null)
-                                FileStream = new FileStream(FilePath, FileMode.Open, FileAccess.ReadWrite);
-                            FileStream.Position = FileStream.Length; //文件移到末尾                            
-                            int offset = commandLen + sizeof(int) + sizeof(int);//前8个字节为包长度+命令长度
-                            size = PacketLength - offset;
-                            FileStream.Write(ReceiveBuffer.Buffer, offset, size);
-                            ReceviedLength += size;
-                            if (ReceviedLength >= FileSize)
-                            {
-                                FileStream.Close();
-                                FileStream.Dispose();
-                                ReceviedLength = 0;
-#if DEBUG
-                                Console.ForegroundColor = ConsoleColor.Green;
-                                Console.WriteLine("文件下载成功，完成时间{0}", DateTime.Now);
-                                Console.ForegroundColor = ConsoleColor.White;
-#endif
-
-                                StaticResetevent.Done.Set();//下载完成
-                                if (DownloadEvent != null)
-                                {
-                                    DownloadEvent.OnProcessDownLoad();
-                                }
-                            }
-                        }
-                    }
-                }
-                else if (CommandParser.Command.Equals(ProtocolKey.Upload, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    if (CheckErrorCode())
-                    {
-                        if (FileStream != null)
-                        {
-                            if (IsSendingFile)
-                            {
-                                CommandComposer.Clear();
-                                CommandComposer.AddRequest();
-                                CommandComposer.AddCommand(ProtocolKey.SendFile);
-                                //CommandComposer.AddValue(ProtocolKey.FileSize, FileStream.Length);
-                                SendCommand();
-                            }
-                        }
-                    }
-                }
-                else
-                {
-#if DEBUG
-                    Console.WriteLine(tmpStr);
-#endif
-                    //Logger.Warn("Unknown Command:" + tmpStr);
-                }
-            }
+            HandlePacket(ReceiveBuffer.Buffer, sizeof(int), PacketLength);
+            //HACK: if (CommandParser.DecodeProtocolText(tmpStr)) //解析命令，命令（除Message）完成后，必须要使用StaticResetevent这个静态信号量，保证同一时刻只有一个命令在执行
             try
             {
                 //判断client.Connected不准确，所以不要使用这个来判断连接是否正常
@@ -435,7 +531,7 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
 
     public new bool ReConnectAndLogin()//重新定义，防止使用基类的方法
     {
-        if (BasicFunc.SocketConnected(Client.Core) && (DoActive()))
+        if (BasicFunc.SocketConnected(Client.Core) && (Active()))
             return true;
         else
         {

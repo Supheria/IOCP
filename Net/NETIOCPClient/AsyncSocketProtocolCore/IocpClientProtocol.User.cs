@@ -34,7 +34,7 @@ partial class IocpClientProtocol
         }
     }
 
-    public bool DoActive()
+    public bool Active()
     {
         try
         {
@@ -75,7 +75,7 @@ partial class IocpClientProtocol
 
     public bool ReConnect()
     {
-        if (BasicFunc.SocketConnected(Client.Core) && (DoActive()))
+        if (BasicFunc.SocketConnected(Client.Core) && (Active()))
             return true;
         else
         {
@@ -98,7 +98,7 @@ partial class IocpClientProtocol
 
     public bool ReConnectAndLogin()
     {
-        if (BasicFunc.SocketConnected(Client.Core) && (!DoActive()))
+        if (BasicFunc.SocketConnected(Client.Core) && (!Active()))
             return true;
         else
         {
