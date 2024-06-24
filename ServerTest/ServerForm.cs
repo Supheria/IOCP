@@ -1,4 +1,5 @@
 
+
 using LocalUtilities.TypeGeneral;
 using Net;
 using System.Text;
@@ -14,7 +15,9 @@ internal class ServerForm : ResizeableForm
 
     Button SwitchButton { get; } = new()
     {
-        Text = "Start"
+        //Text = "Start"
+        // TODO: debug using
+        Text = "Stop"
     };
 
     NumericUpDown Port { get; } = new()
@@ -46,6 +49,7 @@ internal class ServerForm : ResizeableForm
         //Server.OnReceiveClientData += Server_ReceiveClientData;
         Server.OnParallelRemainChange += Server_OnParalleRemainChange;
         Server.OnTip += Server_OnTip;
+        Shown += (_, _) => Server.Start((int)Port.Value);
     }
 
     private void Server_OnTip(string tip, ServerFullHandlerProtocol fullHandler)

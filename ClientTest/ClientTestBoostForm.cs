@@ -16,26 +16,47 @@ public class ClientTestBoostForm : ResizeableForm
         Text = 8000.ToString(),
     };
 
-    Button Start { get; } = new()
+    Button SwitchButton { get; } = new()
     {
-        Text = "start test"
+        Text = "start"
     };
 
     RichTextBox MessageBox { get; } = new();
 
+    System.Timers.Timer Timer { get; } = new();
+
+    bool IsStart { get; set; } = false;
+
     protected override void InitializeComponent()
     {
         Controls.AddRange([
-            Start,
+            SwitchButton,
             IpAddress,
             Port,
             MessageBox,
             ]);
         OnDrawingClient += DrawClient;
-        Start.Click += Start_Click;
+        SwitchButton.Click += Start_Click;
+        Timer.Interval = 300;
+        Timer.Elapsed += (_, _) => Test();
     }
 
     private void Start_Click(object? sender, EventArgs e)
+    {
+        if (!IsStart)
+        {
+            Timer.Start();
+            SwitchButton.Text = "Stop";
+        }
+        else
+        {
+            Timer.Stop();
+            SwitchButton.Text = "Start";
+        }
+        IsStart = !IsStart;
+    }
+
+    private void Test()
     {
         var ipAddress = IpAddress.Text;
         _ = int.TryParse(Port.Text, out var port);
@@ -72,7 +93,13 @@ public class ClientTestBoostForm : ResizeableForm
         var uploadedPath = Path.Combine("upload", UploadFilePath);
         var downloadedPath = Path.Combine("download", uploadedPath);
         if (File.Exists(downloadedPath))
-            File.Delete(downloadedPath);
+        {
+            try
+            {
+                File.Delete(downloadedPath);
+            }
+            catch { }
+        }
         c3.DownloadFile(uploadedPath);
         //
         //Thread.Sleep(10000);
@@ -107,14 +134,14 @@ public class ClientTestBoostForm : ResizeableForm
         Port.Left = IpAddress.Right + width;
         Port.Top = top;
         Port.Width = width;
-        // Start
-        Start.Left = Port.Right + width;
-        Start.Top = top;
-        Start.Width = width;
+        // SwitchButton
+        SwitchButton.Left = Port.Right + width;
+        SwitchButton.Top = top;
+        SwitchButton.Width = width;
         // MessageBox
         MessageBox.Left = ClientLeft + Padding;
-        MessageBox.Top = Start.Bottom + Padding;
+        MessageBox.Top = SwitchButton.Bottom + Padding;
         MessageBox.Width = ClientWidth - Padding * 2;
-        MessageBox.Height = ClientHeight - Start.Height - Padding * 3;
+        MessageBox.Height = ClientHeight - SwitchButton.Height - Padding * 3;
     }
 }
