@@ -31,10 +31,6 @@ public partial class IocpServerProtocol
     /// </summary>
     protected bool IsSendingAsync { get; set; } = false;
 
-    public DateTime ConnectTime { get; } = DateTime.UtcNow;
-
-    public DateTime ActiveTime { get; protected set; } = DateTime.UtcNow;
-
     /// <summary>
     /// 接收异步事件返回的数据，用于对数据进行缓存和分包
     /// </summary>
@@ -44,7 +40,7 @@ public partial class IocpServerProtocol
     /// <returns></returns>
     public virtual bool ProcessReceive(byte[] buffer, int offset, int count)
     {
-        //TODO: ActiveTime = DateTime.UtcNow;
+        SocketInfo.Active();
         ReceiveBuffer.WriteBuffer(buffer, offset, count);
         while (ReceiveBuffer.DataCount > sizeof(int))
         {

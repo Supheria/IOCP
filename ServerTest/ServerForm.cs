@@ -84,7 +84,9 @@ internal class ServerForm : ResizeableForm
         }
         else if (message.Contains("computer"))
         {
+            // TODO: use SendAsync directly
             protocol.SendMessage("result0123456789.9876543210");
+            //protocol.SendAsync("result0123456789.9876543210");
         }
     }
 

@@ -5,41 +5,29 @@ namespace Net;
 
 partial class IocpServerProtocol
 {
-    public IocpServer Server { get; }
-
-    public string UserID { get; protected set; } = "";
-
-    public string UserName { get; protected set; } = "";
-
-    public string UserPermissions { get; protected set; } = "";
-
-    public bool IsLogin { get; protected set; } = false;
-
-    public string SocketFlag { get; protected set; } = "";
+    IocpServer Server { get; }
 
     Socket? AcceptSocket { get; set; } = null;
 
     SocketAsyncEventArgs ReceiveAsyncArgs { get; } = new();
 
     SocketAsyncEventArgs SendAsyncArgs { get; } = new();
-
-    public DynamicBufferManager ReceiveBuffer { get; } = new(ConstTabel.InitBufferSize);
-
-    public AsyncSendBufferManager SendBuffer { get; } = new(ConstTabel.InitBufferSize);
+    
+    DynamicBufferManager ReceiveBuffer { get; } = new(ConstTabel.InitBufferSize);
+    
+    AsyncSendBufferManager SendBuffer { get; } = new(ConstTabel.InitBufferSize);
 
     public SocketInfo SocketInfo { get; } = new();
 
-    public delegate void AsyncUserTokenEvent();
+    public delegate void ServerProtocolEvent();
 
-    public event AsyncUserTokenEvent? OnClosed;
+    public event ServerProtocolEvent? OnClosed;
 
     object Locker { get; } = new();
 
     public IocpServerProtocol(IocpServer server)
     {
         Server = server;
-        ReceiveAsyncArgs.UserToken = this;
-        SendAsyncArgs.UserToken = this;
         ReceiveAsyncArgs.SetBuffer(new byte[ReceiveBuffer.BufferSize], 0, ReceiveBuffer.BufferSize);
         ReceiveAsyncArgs.Completed += (_, _) => ProcessReceive();
         SendAsyncArgs.Completed += (_, _) => ProcessSend();
@@ -66,7 +54,7 @@ partial class IocpServerProtocol
     /// <param name="keepAliveTime">当开启keep-alive后，经过多长时间（ms）开启侦测</param>
     /// <param name="keepAliveInterval">多长时间侦测一次（ms）</param>
     /// <returns>keep alive 输入参数</returns>
-    private byte[] KeepAlive(int onOff, int keepAliveTime, int keepAliveInterval)
+    private static byte[] KeepAlive(int onOff, int keepAliveTime, int keepAliveInterval)
     {
         byte[] buffer = new byte[12];
         BitConverter.GetBytes(onOff).CopyTo(buffer, 0);
@@ -89,8 +77,6 @@ partial class IocpServerProtocol
         }
         AcceptSocket.Close();
         AcceptSocket = null;
-        ReceiveAsyncArgs.AcceptSocket = null;
-        SendAsyncArgs.AcceptSocket = null;
         ReceiveBuffer.Clear(ReceiveBuffer.DataCount);
         SendBuffer.ClearPacket();
         Dispose();

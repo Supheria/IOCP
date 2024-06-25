@@ -40,10 +40,14 @@ partial class IocpServerProtocol : IDisposable
 
     long ReceivedFileSize { get; set; } = 0;
 
+    UserInfo UserInfo { get; } = new();
+
+    bool IsLogin { get; set; } = false;
+
     // TODO: make the dir more common-useable
     public DirectoryInfo RootDirectory { get; set; } = Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "upload"));
 
-    public string RootDirectoryPath => RootDirectory.FullName;
+    string RootDirectoryPath => RootDirectory.FullName;
 
     public void Dispose()
     {
@@ -269,22 +273,23 @@ partial class IocpServerProtocol : IDisposable
     // TODO: modify this for common-use
     private bool DoLogin()
     {
-        if (!CommandParser.GetValueAsString(ProtocolKey.UserID, out var userID) ||
+        if (!CommandParser.GetValueAsString(ProtocolKey.UserID, out var userId) ||
             !CommandParser.GetValueAsString(ProtocolKey.Password, out var password))
             return CommandFail(ProtocolCode.ParameterError, "");
-        var success = userID is "admin" && password is "password";
+        var success = userId is "admin" && password is "password";
         if (!success)
         {
             //ServerInstance.Logger.ErrorFormat("{0} login failure,password error", userID);
             return CommandFail(ProtocolCode.UserOrPasswordError, "");
         }
-        UserID = "admin";
-        UserName = "admin";
+        UserInfo.Id = userId;
+        UserInfo.Name = userId;
+        UserInfo.Password = password;
         IsLogin = true;
         //ServerInstance.Logger.InfoFormat("{0} login success", userID);
         return CommandSucceed(
-            (ProtocolKey.UserID, "admin"),
-            (ProtocolKey.UserID, "admin")
+            (ProtocolKey.UserID, userId),
+            (ProtocolKey.UserID, userId)
             );
     }
 
@@ -337,7 +342,7 @@ partial class IocpServerProtocol : IDisposable
 
     public void SendComplete()
     {
-        //TODO: ActiveTime = DateTime.UtcNow;
+        SocketInfo.Active();
         IsSendingAsync = false;
         SendBuffer.ClearFirstPacket(); // 清除已发送的包
         if (SendBuffer.GetFirstPacket(out var offset, out var count))

@@ -146,11 +146,8 @@ public class IocpServer
         {
             acceptEventArgs.AcceptSocket = null; //释放上次绑定的Socket，等待下一个Socket连接
         }
-        bool willRaiseEvent = Core.AcceptAsync(acceptEventArgs);
-        if (!willRaiseEvent)
-        {
+        if (Core is not null && !Core.AcceptAsync(acceptEventArgs))
             ProcessAccept(acceptEventArgs);
-        }
     }
 
     private void ProcessAccept(SocketAsyncEventArgs acceptArgs)
