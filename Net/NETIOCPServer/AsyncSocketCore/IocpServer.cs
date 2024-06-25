@@ -135,19 +135,19 @@ public class IocpServer
         //ServerInstance.Logger.Info("Server is Stoped");
     }
 
-    public void StartAccept(SocketAsyncEventArgs? acceptEventArgs)
+    public void StartAccept(SocketAsyncEventArgs? acceptArgs)
     {
-        if (acceptEventArgs == null)
+        if (acceptArgs == null)
         {
-            acceptEventArgs = new SocketAsyncEventArgs();
-            acceptEventArgs.Completed += (sender, acceptArgs) => ProcessAccept(acceptArgs);
+            acceptArgs = new SocketAsyncEventArgs();
+            acceptArgs.Completed += (_, args) => ProcessAccept(args);
         }
         else
         {
-            acceptEventArgs.AcceptSocket = null; //释放上次绑定的Socket，等待下一个Socket连接
+            acceptArgs.AcceptSocket = null; //释放上次绑定的Socket，等待下一个Socket连接
         }
-        if (Core is not null && !Core.AcceptAsync(acceptEventArgs))
-            ProcessAccept(acceptEventArgs);
+        if (Core is not null && !Core.AcceptAsync(acceptArgs))
+            ProcessAccept(acceptArgs);
     }
 
     private void ProcessAccept(SocketAsyncEventArgs acceptArgs)
@@ -159,11 +159,11 @@ public class IocpServer
             return;
         }
         ProtocolList.Add(protocol);
-        OnParallelRemainChange?.Invoke(ProtocolPool.Count);
+        new Task(() => OnParallelRemainChange?.Invoke(ProtocolPool.Count)).Start();
         try
         {
             protocol.ReceiveAsync();
-            OnClientNumberChange?.Invoke(ClientState.Connect, protocol);
+            new Task(() => OnClientNumberChange?.Invoke(ClientState.Connect, protocol)).Start();
         }
         catch (Exception E)
         {

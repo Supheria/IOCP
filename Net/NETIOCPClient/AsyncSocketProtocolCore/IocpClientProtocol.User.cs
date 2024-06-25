@@ -17,6 +17,14 @@ partial class IocpClientProtocol
 
     SocketAsyncEventArgs SendAsyncArgs { get; } = new();
 
+    public SocketInfo SocketInfo { get; } = new();
+
+    bool IsConnect { get; set; } = false;
+
+    public delegate void HandleEvent(IocpClientProtocol protocol);
+
+    public event HandleEvent? OnConnect;
+
     /// <summary>
     /// Create a TCP/IP socket.
     /// </summary>
@@ -37,64 +45,69 @@ partial class IocpClientProtocol
 
     }
 
-    public bool Connect(string host, int port)
+    public void Connect(string host, int port)
     {
-        bool result = false;
-        // Connect to a remote device.  
+        if (IsConnect)
+            return;
         try
+        {
+            //ConnectDone.Reset();
+            var connectArgs = new SocketAsyncEventArgs()
+            {
+                RemoteEndPoint = getIpAddress()
+            };
+            connectArgs.Completed += (_, args) => ProcessConnect(args);
+            if (!Core.ConnectAsync(connectArgs))
+                ProcessConnect(connectArgs);
+            //Core.BeginConnect(getIpAddress(), new AsyncCallback(ConnectCallback), Core);
+            //ConnectDone.WaitOne();
+            Host = host;
+            Port = port;
+        }
+        catch (Exception e)
+        {
+            //Console.WriteLine(e.ToString());
+        }
+        IPEndPoint getIpAddress()
         {
             IPAddress ipAddress;
             if (Regex.Matches(host, "[a-zA-Z]").Count > 0)//支持域名解析
             {
-                IPHostEntry ipHostInfo = Dns.GetHostEntry(host);
+                var ipHostInfo = Dns.GetHostEntry(host);
                 ipAddress = ipHostInfo.AddressList[0];
             }
             else
             {
                 ipAddress = IPAddress.Parse(host);
             }
-            IPEndPoint remoteEP = new IPEndPoint(ipAddress, port);
-
-            // Connect to the remote endpoint.  
-            ConnectDone.Reset();
-            Core.BeginConnect(remoteEP, new AsyncCallback(ConnectCallback), Core);
-            ConnectDone.WaitOne();
-            result = Core.Connected;//是否准确？首次使用是准确的，往后使用可能不准确 
-            Host = host;
-            Port = port;
+            return new(ipAddress, port);
         }
-        catch (Exception e)
-        {
-            Console.WriteLine(e.ToString());
-        }
-        return result;
     }
 
     public void Disconnect()
     {
+        if (!IsConnect)
+            return;
+        try
+        {
+            Core.Shutdown(SocketShutdown.Both);
+        }
+        catch (Exception ex)
+        {
+            //Program.Logger.ErrorFormat("CloseClientSocket Disconnect client {0} error, message: {1}", socketInfo, ex.Message);
+        }
         Core.Close();
     }
 
-    private void ConnectCallback(IAsyncResult ar)
+    private void ProcessConnect(SocketAsyncEventArgs connectArgs)
     {
-        try
-        {
-            // Retrieve the socket from the state object.  
-            Socket client = (Socket)ar.AsyncState;
-
-            // Complete the connection.  
-            client.EndConnect(ar);
-#if DEBUG
-            Console.WriteLine("Socket connected to {0}",
-                client.RemoteEndPoint.ToString());
-#endif                     
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine(e.ToString());
-        }
-        // Signal that the connection has been made.  
-        ConnectDone.Set();
+        if (connectArgs.ConnectSocket is null)
+            return;
+        ReceiveAsyncArgs.AcceptSocket = connectArgs.ConnectSocket;
+        SendAsyncArgs.AcceptSocket = connectArgs.ConnectSocket;
+        IsConnect = true;
+        SocketInfo.Connect(connectArgs.ConnectSocket);
+        new Task(() => OnConnect?.Invoke(this)).Start();
     }
 
     public void Send(Socket client, byte[] buffer, int offset, int size, SocketFlags socketFlags)

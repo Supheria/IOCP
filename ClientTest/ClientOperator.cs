@@ -27,6 +27,11 @@ public class ClientOperator
 
     IocpClientProtocol ClientFullHandlerSoclet_DOWNLOAD { get; set; }
 
+    private void OnConncet(IocpClientProtocol protocol)
+    {
+        OnUpdateMessage?.Invoke($"{protocol.UserInfo.Name} connect to {protocol.SocketInfo.RemoteEndPoint}");
+    }
+
     void UploadEvent_UploadProcess()
     {
         OnUpdateMessage?.Invoke($"{Name}: 文件上传完成");
@@ -37,13 +42,14 @@ public class ClientOperator
         OnUpdateMessage?.Invoke($"{Name}: 文件下载完成");
     }
 
-    public void Connet(string ipAddress, int port)
+    public void Connect(string ipAddress, int port)
     {
         ClientFullHandlerSocket_MSG = new(); // 消息发送不需要挂接事件
         //ClientFullHandlerSocket_MSG.SetNoDelay(true);
         try
         {
             ClientFullHandlerSocket_MSG.Connect(ipAddress, port);//增强实时性，使用无延迟发送
+            ClientFullHandlerSocket_MSG.OnConnect += OnConncet;
             ClientFullHandlerSocket_MSG.LocalFilePath = @"d:\temp";
             ClientFullHandlerSocket_MSG.OnReceiveMessage += appHandler_OnReceivedMsg;//接收到消息后处理事件
             ClientFullHandlerSocket_MSG.ReceiveAsync();
@@ -57,7 +63,7 @@ public class ClientOperator
         //login
         if (ClientFullHandlerSocket_MSG.Login("admin", "password"))
         {
-            OnUpdateMessage?.Invoke($"{Name}: connected");
+            new Task(() => OnUpdateMessage?.Invoke($"{Name}: login")).Start();
             //button_connect.Text = "Connected";
             //button_connect.Enabled = false;
             //ClientFullHandlerSocket_MSG.logger.Info("Login success");
