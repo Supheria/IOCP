@@ -29,9 +29,4 @@ partial class IocpServerProtocol
     //    //ServerInstance.Logger.InfoFormat("{0} login success", userName);
     //    return CommandSucceed();
     //}
-
-    public bool DoActive()
-    {
-        return CommandSucceed();
-    }
 }

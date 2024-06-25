@@ -143,7 +143,7 @@ public class AsyncUserToken
         var protocolType = (IocpProtocolTypes)ReceiveAsyncArgs.Buffer[ReceiveAsyncArgs.Offset];
         Protocol = protocolType switch
         {
-            IocpProtocolTypes.FullHandler => new ServerFullHandlerProtocol(Server, this),
+            IocpProtocolTypes.FullHandler => new IocpServerProtocol(Server, this),
             _ => null
         };
         if (Protocol is not null)
@@ -172,7 +172,7 @@ public class AsyncUserToken
         SocketInfo.Active();
         // 调用子类回调函数
         if (SendAsyncArgs.SocketError is SocketError.Success)
-            Protocol.ProcessSend();
+            Protocol.SendComplete();
         else
             Close();
     }

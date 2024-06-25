@@ -9,11 +9,9 @@ namespace Net;
 /// <param name="type"></param>
 /// <param name="server"></param>
 /// <param name="userToken"></param>
-public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpServer server, AsyncUserToken userToken) : IDisposable
+public partial class IocpServerProtocol(IocpServer server, AsyncUserToken userToken)
 {
-    public IocpProtocolTypes Type { get; } = type;
-
-    //HACK: protected IocpServer Server { get; } = server;
+    protected IocpServer Server { get; } = server;
 
     public AsyncUserToken UserToken { get; } = userToken;
 
@@ -40,11 +38,6 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
     public DateTime ConnectTime { get; } = DateTime.UtcNow;
 
     public DateTime ActiveTime { get; protected set; } = DateTime.UtcNow;
-
-    public virtual void Dispose()
-    {
-        GC.SuppressFinalize(this);
-    }
 
     /// <summary>
     /// 接收异步事件返回的数据，用于对数据进行缓存和分包
@@ -95,27 +88,6 @@ public abstract partial class IocpServerProtocol(IocpProtocolTypes type, IocpSer
             return false;
         return ProcessCommand(buffer, offset + sizeof(int) + length, count - sizeof(int) - sizeof(int) - length); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - length，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
     }
-
-    public virtual void ProcessSend()
-    {
-        //HACK: ActiveTime = DateTime.UtcNow;
-        IsSendingAsync = false;
-        UserToken.SendBuffer.ClearFirstPacket(); //清除已发送的包
-        if (UserToken.SendBuffer.GetFirstPacket(out var offset, out var count))
-        {
-            IsSendingAsync = true;
-            UserToken.SendAsync(offset, count);
-        }
-    }
-
-    /// <summary>
-    /// 处理具体命令，子类从这个方法继承，buffer是收到的数据
-    /// </summary>
-    /// <param name="buffer"></param>
-    /// <param name="offset"></param>
-    /// <param name="count"></param>
-    /// <returns></returns>
-    protected abstract bool ProcessCommand(byte[] buffer, int offset, int count);
 
     protected bool CommandFail(int errorCode, string message)
     {

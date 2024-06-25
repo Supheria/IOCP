@@ -52,7 +52,7 @@ internal class ServerForm : ResizeableForm
         Shown += (_, _) => Server.Start((int)Port.Value);
     }
 
-    private void Server_OnTip(string tip, ServerFullHandlerProtocol fullHandler)
+    private void Server_OnTip(string tip, IocpServerProtocol fullHandler)
     {
         UpdateMessage($"tip: {fullHandler.UserToken.SocketInfo.RemoteEndPoint} {tip}");
     }
@@ -69,7 +69,7 @@ internal class ServerForm : ResizeableForm
         }
     }
 
-    private void Server_OnReceiveMessage(string message, ServerFullHandlerProtocol protocol)
+    private void Server_OnReceiveMessage(string message, IocpServerProtocol protocol)
     {
         if (message.Contains(";"))
         {

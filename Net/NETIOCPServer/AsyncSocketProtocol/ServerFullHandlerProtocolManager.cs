@@ -2,26 +2,26 @@
 
 namespace Net;
 
-public class ServerFullHandlerProtocolManager : IEnumerable<ServerFullHandlerProtocol>
+public class ServerFullHandlerProtocolManager : IEnumerable<IocpServerProtocol>
 {
-    List<ServerFullHandlerProtocol> List { get; } = [];
+    List<IocpServerProtocol> List { get; } = [];
 
     public int Count()
     {
         return List.Count;
     }
 
-    public ServerFullHandlerProtocol ElementAt(int index)
+    public IocpServerProtocol ElementAt(int index)
     {
         return List.ElementAt(index);
     }
 
-    public void Add(ServerFullHandlerProtocol value)
+    public void Add(IocpServerProtocol value)
     {
         List.Add(value);
     }
 
-    public void Remove(ServerFullHandlerProtocol value)
+    public void Remove(IocpServerProtocol value)
     {
         List.Remove(value);
     }
@@ -33,11 +33,11 @@ public class ServerFullHandlerProtocolManager : IEnumerable<ServerFullHandlerPro
     {
         foreach (var item in List)
         {
-            ((ServerFullHandlerProtocol)item).SendMessage(msg);
+            ((IocpServerProtocol)item).SendMessage(msg);
         }
     }
 
-    public IEnumerator<ServerFullHandlerProtocol> GetEnumerator()
+    public IEnumerator<IocpServerProtocol> GetEnumerator()
     {
         return List.GetEnumerator();
     }

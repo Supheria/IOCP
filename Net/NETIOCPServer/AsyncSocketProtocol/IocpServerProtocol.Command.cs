@@ -7,7 +7,7 @@ namespace Net;
 /// </summary>
 /// <param name="server"></param>
 /// <param name="userToken"></param>
-public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userToken) : IocpServerProtocol(IocpProtocolTypes.FullHandler, server, userToken)
+partial class IocpServerProtocol : IDisposable
 {
     enum Command
     {
@@ -45,7 +45,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
 
     public string RootDirectoryPath => RootDirectory.FullName;
 
-    public override void Dispose()
+    public void Dispose()
     {
         FilePath = "";
         FileStream?.Close();
@@ -74,7 +74,7 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
     /// <param name="offset"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    protected override bool ProcessCommand(byte[] buffer, int offset, int count)
+    protected bool ProcessCommand(byte[] buffer, int offset, int count)
     {
         CommandComposer.Clear();
         CommandComposer.AddResponse();
@@ -104,6 +104,11 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
             //ServerInstance.Logger.Error("Unknow command: " + CommandParser.Command);
             //return false;
         }
+    }
+
+    public bool DoActive()
+    {
+        return CommandSucceed();
     }
 
     /// <summary>
@@ -330,8 +335,9 @@ public class ServerFullHandlerProtocol(IocpServer server, AsyncUserToken userTok
         }
     }
 
-    public override void ProcessSend()
+    public void SendComplete()
     {
+        //TODO: ActiveTime = DateTime.UtcNow;
         IsSendingAsync = false;
         UserToken.SendBuffer.ClearFirstPacket(); // 清除已发送的包
         if (UserToken.SendBuffer.GetFirstPacket(out var offset, out var count))

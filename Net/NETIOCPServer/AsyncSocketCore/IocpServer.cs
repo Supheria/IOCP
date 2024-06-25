@@ -38,7 +38,7 @@ public class IocpServer
         Disconnect,
     }
 
-    public delegate void HandleMessage(string message, ServerFullHandlerProtocol fullHandler);
+    public delegate void HandleMessage(string message, IocpServerProtocol fullHandler);
 
     public delegate void ClientNumberChange(ClientState state, AsyncUserToken userToken);
 
@@ -182,14 +182,14 @@ public class IocpServer
             StartAccept(acceptArgs); //把当前异步事件释放，等待下次连接
     }
 
-    public void HandleReceiveMessage(string message, ServerFullHandlerProtocol fullHandler)
+    public void HandleReceiveMessage(string message, IocpServerProtocol fullHandler)
     {
         new Task(() => OnReceiveMessage?.Invoke(message, fullHandler)).Start();
     }
 
     public void AddProtocol(IocpServerProtocol? protocol)
     {
-        if (protocol is not ServerFullHandlerProtocol fullHandler)
+        if (protocol is not IocpServerProtocol fullHandler)
             return;
         lock (ServerFullHandlerProtocolManager)
             ServerFullHandlerProtocolManager.Add(fullHandler);
@@ -197,7 +197,7 @@ public class IocpServer
 
     public void RemoveProtocol(IocpServerProtocol? protocol)
     {
-        if (protocol is not ServerFullHandlerProtocol fullHandler)
+        if (protocol is not IocpServerProtocol fullHandler)
             return;
         lock (ServerFullHandlerProtocolManager)
             ServerFullHandlerProtocolManager.Remove(fullHandler);
@@ -245,11 +245,11 @@ public class IocpServer
     }
 
     // TODO: make this reuseable
-    public delegate void HandleTip(string tip, ServerFullHandlerProtocol fullHandler);
+    public delegate void HandleTip(string tip, IocpServerProtocol fullHandler);
 
     public event HandleTip? OnTip;
 
-    public void Tip(string tip, ServerFullHandlerProtocol fullHandler)
+    public void Tip(string tip, IocpServerProtocol fullHandler)
     {
         new Task(() => OnTip?.Invoke(tip, fullHandler)).Start();
     }
