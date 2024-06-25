@@ -29,7 +29,7 @@ public partial class IocpServerProtocol
     /// <summary>
     /// 标识是否有发送异步事件
     /// </summary>
-    protected bool IsSendingAsync { get; set; } = false;
+    bool IsSendingAsync { get; set; } = false;
 
     /// <summary>
     /// 接收异步事件返回的数据，用于对数据进行缓存和分包

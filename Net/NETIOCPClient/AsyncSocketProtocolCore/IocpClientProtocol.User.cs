@@ -26,6 +26,13 @@ partial class IocpClientProtocol
     public event HandleEvent? OnConnect;
 
     /// <summary>
+    /// 标识是否有发送异步事件
+    /// </summary>
+    bool IsSendingAsync { get; set; } = false;
+
+
+
+    /// <summary>
     /// Create a TCP/IP socket.
     /// </summary>
     public Socket Core { get; set; } = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -110,43 +117,35 @@ partial class IocpClientProtocol
         new Task(() => OnConnect?.Invoke(this)).Start();
     }
 
-    public void Send(Socket client, byte[] buffer, int offset, int size, SocketFlags socketFlags)
+    public void SendAsync(int offset, int count)
     {
-        SendDone.Reset();
-        try
-        {
-            client.BeginSend(buffer, offset, size, SocketFlags.None, new AsyncCallback(SendCallback), client);
-        }
-        catch (Exception ex)
-        {
-            //Net.IocpClientProtocol.Logger.Error("AsynchronousClient.cs Send(Socket client, byte[] buffer, int offset, int size, SocketFlags socketFlags) Exception:" + ex.Message);
-            //throw ex;//抛出异常并重置异常的抛出点，异常堆栈中前面的异常被丢失
-            throw;//抛出异常，但不重置异常抛出点，异常堆栈中的异常不会丢失
-        }
-        SendDone.WaitOne();
+        SendAsyncArgs.SetBuffer(SendBuffer.DynamicBufferManager.Buffer, offset, count);
+        if (!Core.SendAsync(SendAsyncArgs))
+            new Task(() => ProcessSend()).Start();
     }
 
-    private static void SendCallback(IAsyncResult ar)
+    public void ProcessSend()
     {
-        try
-        {
-            // Retrieve the socket from the state object.  
-            Socket client = (Socket)ar.AsyncState;
+        SocketInfo.Active();
+        // 调用子类回调函数
+        if (SendAsyncArgs.SocketError is SocketError.Success)
+            SendComplete();
+        else
+            Disconnect();
+    }
 
-            // Complete sending the data to the remote device.  
-            int bytesSend = client.EndSend(ar);
-            //#if DEBUG
-            //                Console.WriteLine("Send {0} bytes to server.", bytesSend);
-            //#endif
-        }
-        catch (Exception e)
+    public void SendComplete()
+    {
+        SocketInfo.Active();
+        IsSendingAsync = false;
+        SendBuffer.ClearFirstPacket(); // 清除已发送的包
+        if (SendBuffer.GetFirstPacket(out var offset, out var count))
         {
-#if DEBUG
-            Console.WriteLine(e.ToString());
-#endif
+            IsSendingAsync = true;
+            SendAsync(offset, count);
         }
-        // Signal that all bytes have been sent.  
-        SendDone.Set();
+        //else
+        //    SendCallback();
     }
 
     //public IocpClientProtocol()

@@ -32,7 +32,7 @@ public partial class IocpClientProtocol
     /// <summary>
     /// 发送数据的缓存，统一写到内存中，调用一次发送
     /// </summary>
-    protected DynamicBufferManager SendBuffer { get; } = new(ConstTabel.ReceiveBufferSize);
+    protected AsyncSendBufferManager SendBuffer { get; } = new(ConstTabel.ReceiveBufferSize);
 
     /// <summary>
     /// 设置SOCKET是否延迟发送
@@ -53,11 +53,20 @@ public partial class IocpClientProtocol
         string commandText = CommandComposer.GetProtocolText();
         byte[] bufferUTF8 = Encoding.UTF8.GetBytes(commandText);
         int totalLength = sizeof(int) + sizeof(int) + bufferUTF8.Length + count; //获取总大小
-        SendBuffer.Clear();
-        SendBuffer.WriteInt(totalLength, false); //写入总大小
-        SendBuffer.WriteInt(bufferUTF8.Length, false); //写入命令大小
-        SendBuffer.WriteBuffer(bufferUTF8); //写入命令内容
-        SendBuffer.WriteBuffer(buffer, offset, count); //写入二进制数据
-        Send(Core, SendBuffer.Buffer, 0, SendBuffer.DataCount, SocketFlags.None);
+        //SendBuffer.Clear();
+        SendBuffer.StartPacket();
+        SendBuffer.DynamicBufferManager.WriteInt(totalLength, false); //写入总大小
+        SendBuffer.DynamicBufferManager.WriteInt(bufferUTF8.Length, false); //写入命令大小
+        SendBuffer.DynamicBufferManager.WriteBuffer(bufferUTF8); //写入命令内容
+        SendBuffer.DynamicBufferManager.WriteBuffer(buffer, offset, count); //写入二进制数据
+        SendBuffer.EndPacket();
+        //SendAsync(Core, SendBuffer.Buffer, 0, SendBuffer.DataCount, SocketFlags.None);
+        if (IsSendingAsync)
+            return;
+        if (!SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
+            return;
+        IsSendingAsync = true;
+        SendAsync(packetOffset, packetCount);
+        return;
     }
 }
