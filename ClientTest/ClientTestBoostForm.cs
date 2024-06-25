@@ -21,6 +21,11 @@ public class ClientTestBoostForm : ResizeableForm
         Text = "start"
     };
 
+    Button SingleButton { get; } = new()
+    {
+        Text = "single"
+    };
+
     RichTextBox MessageBox { get; } = new();
 
     System.Timers.Timer Timer { get; } = new();
@@ -34,11 +39,18 @@ public class ClientTestBoostForm : ResizeableForm
             IpAddress,
             Port,
             MessageBox,
+            SingleButton,
             ]);
         OnDrawingClient += DrawClient;
         SwitchButton.Click += Start_Click;
+        SingleButton.Click += SingleButton_Click;
         Timer.Interval = 100;
         Timer.Elapsed += (_, _) => Test();
+    }
+
+    private void SingleButton_Click(object? sender, EventArgs e)
+    {
+        Test();
     }
 
     private void Start_Click(object? sender, EventArgs e)
@@ -64,13 +76,13 @@ public class ClientTestBoostForm : ResizeableForm
         //
         c1 = new("c1");
         c1.OnUpdateMessage += UpdateMessage;
-        c1.Connet(ipAddress, port);
+        c1.Connect(ipAddress, port);
         //
         //Thread.Sleep(1000);
         //
         c2 = new("c2");
         c2.OnUpdateMessage += UpdateMessage;
-        c2.Connet(ipAddress, port);
+        c2.Connect(ipAddress, port);
         //
         //Thread.Sleep(1000);
         //
@@ -78,12 +90,12 @@ public class ClientTestBoostForm : ResizeableForm
         c1.Disconnet();
         c3 = new("c3");
         c3.OnUpdateMessage += UpdateMessage;
-        c3.Connet(ipAddress, port);
+        c3.Connect(ipAddress, port);
         //
         Thread.Sleep(10);
         //
-        c2.Connet(ipAddress, port);
-        c1.Connet(ipAddress, port);
+        c2.Connect(ipAddress, port);
+        c1.Connect(ipAddress, port);
         c1.SendMessage("c1;Hello World;");
         c1.UploadFile(UploadFilePath);
         //
@@ -124,21 +136,25 @@ public class ClientTestBoostForm : ResizeableForm
 
     private void DrawClient()
     {
-        var width = ClientWidth / 7;
+        var width = ClientWidth / 9;
         var top = ClientTop + Padding;
-        // IpAddress
+        //
         IpAddress.Left = ClientLeft + width;
         IpAddress.Top = top;
         IpAddress.Width = width;
-        // Port
+        //
         Port.Left = IpAddress.Right + width;
         Port.Top = top;
         Port.Width = width;
-        // SwitchButton
-        SwitchButton.Left = Port.Right + width;
+        //
+        SingleButton.Left = Port.Right + width;
+        SingleButton.Top = top;
+        SingleButton.Width = width;
+        //
+        SwitchButton.Left = SingleButton.Right + width;
         SwitchButton.Top = top;
         SwitchButton.Width = width;
-        // MessageBox
+        //
         MessageBox.Left = ClientLeft + Padding;
         MessageBox.Top = SwitchButton.Bottom + Padding;
         MessageBox.Width = ClientWidth - Padding * 2;
