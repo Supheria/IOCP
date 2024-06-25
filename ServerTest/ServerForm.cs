@@ -52,9 +52,9 @@ internal class ServerForm : ResizeableForm
         Shown += (_, _) => Server.Start((int)Port.Value);
     }
 
-    private void Server_OnTip(string tip, IocpServerProtocol fullHandler)
+    private void Server_OnTip(string tip, IocpServerProtocol protocol)
     {
-        UpdateMessage($"tip: {fullHandler.UserToken.SocketInfo.RemoteEndPoint} {tip}");
+        UpdateMessage($"tip: {protocol.SocketInfo.RemoteEndPoint} {tip}");
     }
 
     private void Server_OnParalleRemainChange(int remain)
@@ -78,7 +78,7 @@ internal class ServerForm : ResizeableForm
             {
                 if (!string.IsNullOrWhiteSpace(s))
                 {
-                    UpdateMessage($"{protocol.UserToken.SocketInfo.RemoteEndPoint}: {s}");
+                    UpdateMessage($"{protocol.SocketInfo.RemoteEndPoint}: {s}");
                 }
             }
         }
@@ -88,15 +88,15 @@ internal class ServerForm : ResizeableForm
         }
     }
 
-    private void Server_OnClientNumberChange(IocpServer.ClientState state, AsyncUserToken userToken)
+    private void Server_OnClientNumberChange(IocpServer.ClientState state, IocpServerProtocol protocol)
     {
         if (state is IocpServer.ClientState.Connect)
         {
-            UpdateMessage($"{userToken.SocketInfo.RemoteEndPoint} connect");
+            UpdateMessage($"{protocol.SocketInfo.RemoteEndPoint} connect");
         }
         else
         {
-            UpdateMessage($"{userToken.SocketInfo.RemoteEndPoint} disconnect");
+            UpdateMessage($"{protocol.SocketInfo.RemoteEndPoint} disconnect");
         }
     }
 

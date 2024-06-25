@@ -21,16 +21,11 @@ public class IocpServer
     /// </summary>
     public int TimeoutMilliseconds { get; }
 
-    AsyncUserTokenPool UserTokenPool { get; }
+    ServerProtocolPool ProtocolPool { get; }
 
-    public AsyncUserTokenList UserTokenList { get; } = [];
+    public ServerProtocolList ProtocolList { get; } = [];
 
     private DaemonThread DaemonThread { get; }
-
-    /// <summary>
-    /// 所有新加入的服务端协议，必须在此处实例化
-    /// </summary>
-    public ServerFullHandlerProtocolManager ServerFullHandlerProtocolManager { get; } = [];
 
     public enum ClientState
     {
@@ -38,9 +33,9 @@ public class IocpServer
         Disconnect,
     }
 
-    public delegate void HandleMessage(string message, IocpServerProtocol fullHandler);
+    public delegate void HandleMessage(string message, IocpServerProtocol protocol);
 
-    public delegate void ClientNumberChange(ClientState state, AsyncUserToken userToken);
+    public delegate void ClientNumberChange(ClientState state, IocpServerProtocol protocol);
 
     public delegate void ParallelRemainChange(int remain);
 
@@ -53,19 +48,19 @@ public class IocpServer
     public IocpServer(int parallelCountMax, int timeoutMilliseconds)
     {
         ParallelCountMax = parallelCountMax;
-        UserTokenPool = new(parallelCountMax);
+        ProtocolPool = new(parallelCountMax);
         DaemonThread = new(ProcessDaemon);
         for (int i = 0; i < ParallelCountMax; i++) //按照连接数建立读写对象
         {
-            var userToken = new AsyncUserToken(this);
-            userToken.OnClosed += () =>
+            var protocol = new IocpServerProtocol(this);
+            protocol.OnClosed += () =>
             {
-                UserTokenPool.Push(userToken);
-                UserTokenList.Remove(userToken);
-                OnClientNumberChange?.Invoke(ClientState.Disconnect, userToken);
-                OnParallelRemainChange?.Invoke(UserTokenPool.Count);
+                ProtocolPool.Push(protocol);
+                ProtocolList.Remove(protocol);
+                OnClientNumberChange?.Invoke(ClientState.Disconnect, protocol);
+                OnParallelRemainChange?.Invoke(ProtocolPool.Count);
             };
-            UserTokenPool.Push(userToken);
+            ProtocolPool.Push(protocol);
         }
         TimeoutMilliseconds = timeoutMilliseconds;
     }
@@ -75,15 +70,15 @@ public class IocpServer
     /// </summary>
     private void ProcessDaemon()
     {
-        UserTokenList.CopyTo(out var userTokenss);
-        foreach (var userToken in userTokenss)
+        ProtocolList.CopyTo(out var userTokenss);
+        foreach (var protocol in userTokenss)
         {
             try
             {
-                if ((DateTime.Now - userToken.SocketInfo.ActiveTime).Milliseconds > TimeoutMilliseconds) //超时Socket断开
+                if ((DateTime.Now - protocol.SocketInfo.ActiveTime).Milliseconds > TimeoutMilliseconds) //超时Socket断开
                 {
-                    lock (userToken)
-                        userToken.Close();
+                    lock (protocol)
+                        protocol.Close();
                 }
             }
             catch (Exception ex)
@@ -130,10 +125,10 @@ public class IocpServer
             //ServerInstance.Logger.Info("server {0} has not started yet", localEndPoint.ToString());
             return;
         }
-        UserTokenList.CopyTo(out var userTokens);
-        foreach (var userToken in userTokens)//双向关闭已存在的连接
-            userToken.Close();
-        UserTokenList.Clear();
+        ProtocolList.CopyTo(out var userTokens);
+        foreach (var protocol in userTokens)//双向关闭已存在的连接
+            protocol.Close();
+        ProtocolList.Clear();
         Core?.Close();
         DaemonThread.Stop();
         IsStart = false;
@@ -160,47 +155,31 @@ public class IocpServer
 
     private void ProcessAccept(SocketAsyncEventArgs acceptArgs)
     {
-        var userToken = UserTokenPool.Pop();
-        if (!userToken.ProcessAccept(acceptArgs.AcceptSocket))
+        var protocol = ProtocolPool.Pop();
+        if (!protocol.ProcessAccept(acceptArgs.AcceptSocket))
         {
-            UserTokenPool.Push(userToken);
+            ProtocolPool.Push(protocol);
             return;
         }
-        UserTokenList.Add(userToken);
-        OnParallelRemainChange?.Invoke(UserTokenPool.Count);
+        ProtocolList.Add(protocol);
+        OnParallelRemainChange?.Invoke(ProtocolPool.Count);
         try
         {
-            userToken.ReceiveAsync();
-            OnClientNumberChange?.Invoke(ClientState.Connect, userToken);
+            protocol.ReceiveAsync();
+            OnClientNumberChange?.Invoke(ClientState.Connect, protocol);
         }
         catch (Exception E)
         {
-            //ServerInstance.Logger.ErrorFormat("Accept client {0} error, message: {1}", userToken.AcceptSocket, E.Message);
+            //ServerInstance.Logger.ErrorFormat("Accept client {0} error, message: {1}", protocol.AcceptSocket, E.Message);
             //ServerInstance.Logger.Error(E.StackTrace);
         }
         if (acceptArgs.SocketError is not SocketError.OperationAborted)
             StartAccept(acceptArgs); //把当前异步事件释放，等待下次连接
     }
 
-    public void HandleReceiveMessage(string message, IocpServerProtocol fullHandler)
+    public void HandleReceiveMessage(string message, IocpServerProtocol protocol)
     {
-        new Task(() => OnReceiveMessage?.Invoke(message, fullHandler)).Start();
-    }
-
-    public void AddProtocol(IocpServerProtocol? protocol)
-    {
-        if (protocol is not IocpServerProtocol fullHandler)
-            return;
-        lock (ServerFullHandlerProtocolManager)
-            ServerFullHandlerProtocolManager.Add(fullHandler);
-    }
-
-    public void RemoveProtocol(IocpServerProtocol? protocol)
-    {
-        if (protocol is not IocpServerProtocol fullHandler)
-            return;
-        lock (ServerFullHandlerProtocolManager)
-            ServerFullHandlerProtocolManager.Remove(fullHandler);
+        new Task(() => OnReceiveMessage?.Invoke(message, protocol)).Start();
     }
 
     /// <summary>
@@ -213,18 +192,16 @@ public class IocpServer
         if (isFileInUse())
         {
             bool result = true;
-            lock (ServerFullHandlerProtocolManager)
+            ProtocolList.CopyTo(out var userTokenss);
+            foreach (var protocol in userTokenss)
             {
-                foreach (var fullHandler in ServerFullHandlerProtocolManager)
+                if (!filePath.Equals(protocol.FilePath, StringComparison.CurrentCultureIgnoreCase))
+                    continue;
+                lock (protocol) // AsyncSocketUserToken有多个线程访问
                 {
-                    if (!filePath.Equals(fullHandler.FilePath, StringComparison.CurrentCultureIgnoreCase))
-                        continue;
-                    lock (fullHandler.UserToken) // AsyncSocketUserToken有多个线程访问
-                    {
-                        fullHandler.UserToken.Close();
-                    }
-                    result = false;
+                    protocol.Close();
                 }
+                result = false;
             }
             return result;
         }
@@ -245,12 +222,12 @@ public class IocpServer
     }
 
     // TODO: make this reuseable
-    public delegate void HandleTip(string tip, IocpServerProtocol fullHandler);
+    public delegate void HandleTip(string tip, IocpServerProtocol protocol);
 
     public event HandleTip? OnTip;
 
-    public void Tip(string tip, IocpServerProtocol fullHandler)
+    public void Tip(string tip, IocpServerProtocol protocol)
     {
-        new Task(() => OnTip?.Invoke(tip, fullHandler)).Start();
+        new Task(() => OnTip?.Invoke(tip, protocol)).Start();
     }
 }

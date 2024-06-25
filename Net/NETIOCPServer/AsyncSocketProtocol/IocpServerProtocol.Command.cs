@@ -172,7 +172,7 @@ partial class IocpServerProtocol : IDisposable
             IsReceivingFile = false;
 #if DEBUG
             // TODO: handle this event
-            UserToken.Server.Tip($"文件接收成功，完成时间{DateTime.Now}", this);
+            Server.Tip($"文件接收成功，完成时间{DateTime.Now}", this);
 #endif
         }
         CommandComposer.Clear();
@@ -201,7 +201,7 @@ partial class IocpServerProtocol : IDisposable
         FileStream = null;
         if (File.Exists(FilePath))
         {
-            if (UserToken.Server.CheckFileInUse(FilePath))
+            if (Server.CheckFileInUse(FilePath))
             {
                 FilePath = "";
                 return CommandFail(ProtocolCode.FileIsInUse, "");
@@ -238,7 +238,7 @@ partial class IocpServerProtocol : IDisposable
             FilePath = "";
             return CommandFail(ProtocolCode.FileNotExist, "");
         }
-        if (UserToken.Server.CheckFileInUse(FilePath))
+        if (Server.CheckFileInUse(FilePath))
         {
             FilePath = "";
             //ServerInstance.Logger.Error("Start download file error, file is in use: " + filePath);
@@ -258,7 +258,7 @@ partial class IocpServerProtocol : IDisposable
     private bool DoHandleMessage(byte[] buffer, int offset, int count)
     {
         var message = Encoding.UTF8.GetString(buffer, offset, count);
-        UserToken.Server.HandleReceiveMessage(message, this);
+        Server.HandleReceiveMessage(message, this);
         // TODO: for test
 #if DEBUG
         SendMessage("result: received");
@@ -339,11 +339,11 @@ partial class IocpServerProtocol : IDisposable
     {
         //TODO: ActiveTime = DateTime.UtcNow;
         IsSendingAsync = false;
-        UserToken.SendBuffer.ClearFirstPacket(); // 清除已发送的包
-        if (UserToken.SendBuffer.GetFirstPacket(out var offset, out var count))
+        SendBuffer.ClearFirstPacket(); // 清除已发送的包
+        if (SendBuffer.GetFirstPacket(out var offset, out var count))
         {
             IsSendingAsync = true;
-            UserToken.SendAsync(offset, count);
+            SendAsync(offset, count);
         }
         else
             SendCallback();
