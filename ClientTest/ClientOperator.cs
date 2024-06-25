@@ -23,11 +23,11 @@ public class ClientOperator
 
     public event UpdateMessage? OnUpdateMessage;
 
-    ClientFullHandlerProtocol ClientFullHandlerSocket_MSG { get; set; }
+    IocpClientProtocol ClientFullHandlerSocket_MSG { get; set; }
 
-    ClientFullHandlerProtocol ClientFullHandlerSocket_UPLOAD { get; set; }
+    IocpClientProtocol ClientFullHandlerSocket_UPLOAD { get; set; }
 
-    ClientFullHandlerProtocol ClientFullHandlerSoclet_DOWNLOAD { get; set; }
+    IocpClientProtocol ClientFullHandlerSoclet_DOWNLOAD { get; set; }
 
     /// <summary>
     /// 下载完成事件
@@ -67,7 +67,7 @@ public class ClientOperator
             return;
         }
         //login
-        if (ClientFullHandlerSocket_MSG.DoLogin("admin", "password"))
+        if (ClientFullHandlerSocket_MSG.Login("admin", "password"))
         {
             OnUpdateMessage?.Invoke($"{Name}: connected");
             //button_connect.Text = "Connected";
@@ -126,11 +126,11 @@ public class ClientOperator
     {
         if (ClientFullHandlerSocket_UPLOAD == null)
         {
-            ClientFullHandlerSocket_UPLOAD = new ClientFullHandlerProtocol(null, UploadEvent);//只挂接上传事件
+            ClientFullHandlerSocket_UPLOAD = new(null, UploadEvent);//只挂接上传事件
             ClientFullHandlerSocket_UPLOAD.Connect("127.0.0.1", 8000);
             ClientFullHandlerSocket_UPLOAD.LocalFilePath = @"d:\temp";
             ClientFullHandlerSocket_UPLOAD.ReceiveMessageHead();
-            ClientFullHandlerSocket_UPLOAD.DoLogin("admin", "password");
+            ClientFullHandlerSocket_UPLOAD.Login("admin", "password");
         }
         ClientFullHandlerSocket_UPLOAD.DoUpload(localFilePath, "", new FileInfo(localFilePath).Name);
     }
@@ -139,11 +139,11 @@ public class ClientOperator
     {
         if (ClientFullHandlerSoclet_DOWNLOAD == null)
         {
-            ClientFullHandlerSoclet_DOWNLOAD = new ClientFullHandlerProtocol(DownLoadEvent, null);//只挂接下载事件
+            ClientFullHandlerSoclet_DOWNLOAD = new(DownLoadEvent, null);//只挂接下载事件
             ClientFullHandlerSoclet_DOWNLOAD.Connect("127.0.0.1", 8000);
             ClientFullHandlerSoclet_DOWNLOAD.LocalFilePath = "download";
             ClientFullHandlerSoclet_DOWNLOAD.ReceiveMessageHead();
-            ClientFullHandlerSoclet_DOWNLOAD.DoLogin("admin", "password");
+            ClientFullHandlerSoclet_DOWNLOAD.Login("admin", "password");
         }
         FileInfo fi = new FileInfo(remoteFilePath);
         ClientFullHandlerSoclet_DOWNLOAD.DoDownload(fi.DirectoryName, fi.Name, fi.DirectoryName.Substring(fi.DirectoryName.LastIndexOf("\\", StringComparison.Ordinal)));

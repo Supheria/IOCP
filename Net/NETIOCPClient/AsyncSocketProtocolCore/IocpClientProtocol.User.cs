@@ -7,11 +7,7 @@ partial class IocpClientProtocol
     // HACK: public static ILog Logger;
     protected string ErrorString { get; set; } = "";
 
-    protected string UserID { get; set; } = "";
-
-    protected string UserName { get; set; } = "";
-
-    protected string Password { get; set; } = "";
+    public UserInfo UserInfo { get; } = new();
 
     //public IocpClientProtocol()
     //    : base()
@@ -53,26 +49,6 @@ partial class IocpClientProtocol
         }
     }
 
-    public bool DoLogin(string userName, string password)
-    {
-        try
-        {
-            CommandComposer.Clear();
-            CommandComposer.AddRequest();
-            CommandComposer.AddCommand(ProtocolKey.Login);
-            CommandComposer.AddValue(ProtocolKey.UserName, userName);
-            CommandComposer.AddValue(ProtocolKey.Password, BasicFunc.MD5String(password));
-            SendCommand();
-            return true;
-        }
-        catch (Exception E)
-        {
-            //记录日志
-            ErrorString = E.Message;
-            return false;
-        }
-    }
-
     public bool ReConnect()
     {
         if (BasicFunc.SocketConnected(Client.Core) && (Active()))
@@ -88,31 +64,6 @@ partial class IocpClientProtocol
                 }
                 catch (Exception)
                 {
-                    return false;
-                }
-            }
-            else
-                return true;
-        }
-    }
-
-    public bool ReConnectAndLogin()
-    {
-        if (BasicFunc.SocketConnected(Client.Core) && (!Active()))
-            return true;
-        else
-        {
-            if (!BasicFunc.SocketConnected(Client.Core))
-            {
-                try
-                {
-                    Disconnect();
-                    Connect(Host, Port);
-                    return DoLogin(UserName, Password);
-                }
-                catch (Exception E)
-                {
-                    //Logger.Error(E.Message);
                     return false;
                 }
             }

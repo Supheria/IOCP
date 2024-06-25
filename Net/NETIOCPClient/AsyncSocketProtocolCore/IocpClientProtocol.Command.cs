@@ -51,7 +51,7 @@ public class UploadEvent
     }
 }
 
-public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent uploadEvent) : IocpClientProtocol(IocpProtocolTypes.FullHandler)
+partial class IocpClientProtocol(DownloadEvent downloadEvent, UploadEvent uploadEvent)
 {
     enum Command
     {
@@ -72,8 +72,6 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
     int PacketReceived { get; set; } = 0;
 
     public UserInfo LoginUser { get; } = new();
-
-    new string Password { get; set; } = "";
 
     bool BnetWorkOperate { get; set; } = false;
 
@@ -314,11 +312,8 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
     {
         if (CheckErrorCode())//返回登录成功
         {
-            UserID = CommandParser.Values[1];
-            UserName = CommandParser.Values[2];
-            LoginUser.Id = UserID;
-            LoginUser.Password = Password;
-            LoginUser.Name = UserName;
+            UserInfo.Id = CommandParser.Values[1];
+            UserInfo.Name = CommandParser.Values[2];
             BnetWorkOperate = true;
         }
         else
@@ -496,7 +491,8 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
             //Logger.Error("AsyncClientFullHandlerSocket.ReceiveMessageDataCallback:" + e.Message);
         }
     }
-    public new bool DoLogin(string userID, string password)
+
+    public bool Login(string userID, string password)
     {
         try
         {
@@ -506,7 +502,7 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
             CommandComposer.AddValue(ProtocolKey.UserID, userID);
             //CommandComposer.AddValue(ProtocolKey.Password, IocpServer.BasicFunc.MD5String(password));
             CommandComposer.AddValue(ProtocolKey.Password, password);
-            Password = password;
+            UserInfo.Password = password;
             SendCommand();
             StaticResetevent.Done.WaitOne();//登录阻塞，强制同步
             return BnetWorkOperate;
@@ -521,7 +517,7 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
     }
 
 
-    public new bool ReConnectAndLogin()//重新定义，防止使用基类的方法
+    public bool ReConnectAndLogin()//重新定义，防止使用基类的方法
     {
         if (BasicFunc.SocketConnected(Client.Core) && (Active()))
             return true;
@@ -534,7 +530,7 @@ public class ClientFullHandlerProtocol(DownloadEvent downloadEvent, UploadEvent 
                     Disconnect();
                     Connect(Host, Port);
                     ReceiveMessageHead();
-                    return DoLogin(UserID, Password);
+                    return Login(UserInfo.Id, UserInfo.Password);
                 }
                 catch (Exception E)
                 {

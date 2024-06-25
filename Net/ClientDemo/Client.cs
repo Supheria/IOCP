@@ -6,9 +6,9 @@ namespace ClientDemo
 {
     public partial class Client : Form
     {
-        private ClientFullHandlerProtocol ClientFullHandlerSocket_MSG;
-        private ClientFullHandlerProtocol ClientFullHandlerSocket_UPLOAD;
-        private ClientFullHandlerProtocol ClientFullHandlerSoclet_DOWNLOAD;
+        private IocpClientProtocol ClientFullHandlerSocket_MSG;
+        private IocpClientProtocol ClientFullHandlerSocket_UPLOAD;
+        private IocpClientProtocol ClientFullHandlerSoclet_DOWNLOAD;
         private DownloadEvent downLoadEvent;//下载完成事件
         private UploadEvent uploadEvent;//上传完成事件
         private bool stop = false;
@@ -39,7 +39,7 @@ namespace ClientDemo
 
         private void button_connect_Click(object sender, EventArgs e)
         {
-            ClientFullHandlerSocket_MSG = new ClientFullHandlerProtocol(null, null);//消息发送不需要挂接事件
+            ClientFullHandlerSocket_MSG = new(null, null);//消息发送不需要挂接事件
             //ClientFullHandlerSocket_MSG.SetNoDelay(true);
             try
             {
@@ -55,7 +55,7 @@ namespace ClientDemo
                 return;
             }
             //login
-            if (ClientFullHandlerSocket_MSG.DoLogin("admin", "password"))
+            if (ClientFullHandlerSocket_MSG.Login("admin", "password"))
             {
                 button_connect.Text = "Connected";
                 button_connect.Enabled = false;
@@ -101,11 +101,11 @@ namespace ClientDemo
         {
             if (ClientFullHandlerSocket_UPLOAD == null)
             {
-                ClientFullHandlerSocket_UPLOAD = new ClientFullHandlerProtocol(null, uploadEvent);//只挂接上传事件
+                ClientFullHandlerSocket_UPLOAD = new(null, uploadEvent);//只挂接上传事件
                 ClientFullHandlerSocket_UPLOAD.Connect("127.0.0.1", 8000);
                 ClientFullHandlerSocket_UPLOAD.LocalFilePath = @"d:\temp";
                 ClientFullHandlerSocket_UPLOAD.ReceiveMessageHead();
-                ClientFullHandlerSocket_UPLOAD.DoLogin("admin", "password");
+                ClientFullHandlerSocket_UPLOAD.Login("admin", "password");
             }
             ClientFullHandlerSocket_UPLOAD.DoUpload(fileFullPath, "", new FileInfo(fileFullPath).Name);
         }
@@ -134,11 +134,11 @@ namespace ClientDemo
         {
             if (ClientFullHandlerSoclet_DOWNLOAD == null)
             {
-                ClientFullHandlerSoclet_DOWNLOAD = new ClientFullHandlerProtocol(downLoadEvent, null);//只挂接下载事件
+                ClientFullHandlerSoclet_DOWNLOAD = new(downLoadEvent, null);//只挂接下载事件
                 ClientFullHandlerSoclet_DOWNLOAD.Connect("127.0.0.1", 8000);
                 ClientFullHandlerSoclet_DOWNLOAD.LocalFilePath = @"d:\temp";
                 ClientFullHandlerSoclet_DOWNLOAD.ReceiveMessageHead();
-                ClientFullHandlerSoclet_DOWNLOAD.DoLogin("admin", "password");
+                ClientFullHandlerSoclet_DOWNLOAD.Login("admin", "password");
             }
             FileInfo fi = new FileInfo(remoteFileFullPath);
             ClientFullHandlerSoclet_DOWNLOAD.DoDownload(fi.DirectoryName, fi.Name, fi.DirectoryName.Substring(fi.DirectoryName.LastIndexOf("\\", StringComparison.Ordinal)));

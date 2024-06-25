@@ -3,17 +3,13 @@ using System.Text;
 
 namespace Net;
 
-public abstract partial class IocpClientProtocol(IocpProtocolTypes type)
+public partial class IocpClientProtocol
 {
     public IocpClient Client { get; } = new();
 
     protected string Host { get; private set; } = "";
 
     protected int Port { get; private set; } = 0;
-
-    protected IocpProtocolTypes Type { get; } = type;
-
-    // HACK: protected int SocketTimeOutMS { get { return Client.SendTimeout; } set { Client.SendTimeout = value; Client.TimeoutMilliseconds = value; } }
 
     /// <summary>
     /// 长度是否使用网络字节顺序
@@ -44,10 +40,10 @@ public abstract partial class IocpClientProtocol(IocpProtocolTypes type)
     /// 设置SOCKET是否延迟发送
     /// </summary>
     /// <param name="NoDelay"></param>
-    public void SetNoDelay(bool NoDelay)
-    {
-        Client.Core.NoDelay = NoDelay;
-    }
+    //HACK: public void SetNoDelay(bool NoDelay)
+    //{
+    //    Client.Core.NoDelay = NoDelay;
+    //}
 
     public void Connect(string host, int port)
     {
