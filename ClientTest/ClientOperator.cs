@@ -79,17 +79,17 @@ public class ClientOperator
     {
         try
         {
-            ClientFullHandlerSocket_MSG?.Disconnect();
+            ClientFullHandlerSocket_MSG?.Close();
         }
         catch { }
         try
         {
-            ClientFullHandlerSocket_UPLOAD?.Disconnect();
+            ClientFullHandlerSocket_UPLOAD?.Close();
         }
         catch { }
         try
         {
-            ClientFullHandlerSoclet_DOWNLOAD?.Disconnect();
+            ClientFullHandlerSoclet_DOWNLOAD?.Close();
         }
         catch { }
     }

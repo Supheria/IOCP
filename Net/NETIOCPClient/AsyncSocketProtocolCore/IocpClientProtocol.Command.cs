@@ -356,7 +356,7 @@ partial class IocpClientProtocol
             {
                 try
                 {
-                    Disconnect();
+                    Close();
                     Connect(Host, Port);
                     ReceiveAsync();
                     return Login(UserInfo.Id, UserInfo.Password);

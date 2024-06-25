@@ -9,9 +9,9 @@ namespace Net;
 
 partial class IocpClientProtocol
 {
-    SocketAsyncEventArgs ReceiveAsyncArgs { get; } = new();
+    //SocketAsyncEventArgs ReceiveAsyncArgs { get; } = new();
 
-    SocketAsyncEventArgs SendAsyncArgs { get; } = new();
+    //SocketAsyncEventArgs SendAsyncArgs { get; } = new();
 
     public SocketInfo SocketInfo { get; } = new();
 
@@ -29,24 +29,24 @@ partial class IocpClientProtocol
     /// <summary>
     /// Create a TCP/IP socket.
     /// </summary>
-    public Socket Socket { get; set; } = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+    public Socket? Socket { get; set; } = null;
 
-    public int TimeoutMilliseconds
-    {
-        get => Socket.ReceiveTimeout;
-        set
-        {
-            Socket.ReceiveTimeout = value;
-            Socket.SendTimeout = value;
-        }
-    }
+    //public int TimeoutMilliseconds
+    //{
+    //    get => Socket.ReceiveTimeout;
+    //    set
+    //    {
+    //        Socket.ReceiveTimeout = value;
+    //        Socket.SendTimeout = value;
+    //    }
+    //}
 
     object Locker { get; } = new();
 
     public IocpClientProtocol()
     {
-        ReceiveAsyncArgs.Completed += (_, _) => ProcessReceive();
-        SendAsyncArgs.Completed += (_, _) => ProcessSend();
+        //ReceiveAsyncArgs.Completed += (_, _) => ProcessReceive();
+        //SendAsyncArgs.Completed += (_, _) => ProcessSend();
     }
 
     public void Connect(string host, int port)
@@ -61,10 +61,9 @@ partial class IocpClientProtocol
                 RemoteEndPoint = getIpAddress()
             };
             connectArgs.Completed += (_, args) => ProcessConnect(args);
+            Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             if (!Socket.ConnectAsync(connectArgs))
                 ProcessConnect(connectArgs);
-            //Core.BeginConnect(getIpAddress(), new AsyncCallback(ConnectCallback), Core);
-            //ConnectDone.WaitOne();
             Host = host;
             Port = port;
         }
@@ -88,9 +87,24 @@ partial class IocpClientProtocol
         }
     }
 
-    public void Disconnect()
+    private void ProcessConnect(SocketAsyncEventArgs connectArgs)
     {
-        if (!IsConnect)
+        if (connectArgs.ConnectSocket is null)
+        {
+            Socket?.Close();
+            Socket?.Dispose();
+            return;
+        }
+        //ReceiveAsyncArgs.AcceptSocket = connectArgs.ConnectSocket;
+        //SendAsyncArgs.AcceptSocket = connectArgs.ConnectSocket;
+        new Task(() => OnConnect?.Invoke(this)).Start();
+        SocketInfo.Connect(connectArgs.ConnectSocket);
+        IsConnect = true;
+    }
+
+    public void Close()
+    {
+        if (Socket is null || !IsConnect)
             return;
         try
         {
@@ -100,18 +114,12 @@ partial class IocpClientProtocol
         {
             //Program.Logger.ErrorFormat("CloseClientSocket Disconnect client {0} error, message: {1}", socketInfo, ex.Message);
         }
+        ReceiveBuffer.Clear();
+        SendBuffer.ClearPacket();
+        // TODO: Dispose
         Socket.Close();
-    }
-
-    private void ProcessConnect(SocketAsyncEventArgs connectArgs)
-    {
-        if (connectArgs.ConnectSocket is null)
-            return;
-        ReceiveAsyncArgs.AcceptSocket = connectArgs.ConnectSocket;
-        SendAsyncArgs.AcceptSocket = connectArgs.ConnectSocket;
-        IsConnect = true;
-        SocketInfo.Connect(connectArgs.ConnectSocket);
-        new Task(() => OnConnect?.Invoke(this)).Start();
+        SocketInfo.Disconnect();
+        IsConnect = false;
     }
     /// <summary>
     /// 循环接收消息
@@ -231,32 +239,33 @@ partial class IocpClientProtocol
         ProcessCommand(buffer, offset + sizeof(int) + commandLength, count - sizeof(int) - sizeof(int) - commandLength); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - commandLength，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
     }
 
-    public void SendAsync(int offset, int count)
+    public void SendAsync(byte[] buffer, int offset, int count)
     {
-        SendAsyncArgs.SetBuffer(SendBuffer.DynamicBufferManager.Buffer, offset, count);
-        if (!Socket.SendAsync(SendAsyncArgs))
-            new Task(() => ProcessSend()).Start();
+        if (Socket is null)
+            return;
+        var sendArgs = new SocketAsyncEventArgs();
+        sendArgs.SetBuffer(buffer, offset, count);
+        sendArgs.Completed += (_, args) => ProcessSend(args);
+        if (!Socket.SendAsync(sendArgs))
+            new Task(() => ProcessSend(sendArgs)).Start();
     }
 
-    public void ProcessSend()
+    public void ProcessSend(SocketAsyncEventArgs sendArgs)
     {
         SocketInfo.Active();
         // 调用子类回调函数
-        if (SendAsyncArgs.SocketError is SocketError.Success)
-            SendComplete();
-        else
-            Disconnect();
-    }
-
-    public void SendComplete()
-    {
+        if (sendArgs.SocketError is not SocketError.Success)
+        {
+            Close();
+            return;
+        }
         SocketInfo.Active();
         IsSendingAsync = false;
         SendBuffer.ClearFirstPacket(); // 清除已发送的包
         if (SendBuffer.GetFirstPacket(out var offset, out var count))
         {
             IsSendingAsync = true;
-            SendAsync(offset, count);
+            SendAsync(SendBuffer.DynamicBufferManager.Buffer, offset, count);
         }
         //else
         //    SendCallback();

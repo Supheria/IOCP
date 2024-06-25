@@ -99,7 +99,7 @@ public class ClientTestBoostForm : ResizeableForm
         c1.SendMessage("c1;Hello World;");
         c1.UploadFile(UploadFilePath);
         //
-        Thread.Sleep(10);
+        Thread.Sleep(100);
         //
         c2.SendMessage("c2;Hello Host;");
         var uploadedPath = Path.Combine("upload", UploadFilePath);
@@ -120,7 +120,7 @@ public class ClientTestBoostForm : ResizeableForm
         //c1.Disconnet();
     }
 
-    static string UploadFilePath => "express test.bmp";
+    static string UploadFilePath => "express test";
 
     private void UpdateMessage(string message)
     {
