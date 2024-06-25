@@ -45,8 +45,8 @@ public class ClientOperator
         {
             ClientFullHandlerSocket_MSG.Connect(ipAddress, port);//增强实时性，使用无延迟发送
             ClientFullHandlerSocket_MSG.LocalFilePath = @"d:\temp";
-            ClientFullHandlerSocket_MSG.Client.OnReceiveMessage += appHandler_OnReceivedMsg;//接收到消息后处理事件
-            ClientFullHandlerSocket_MSG.ReceiveMessageHead();
+            ClientFullHandlerSocket_MSG.OnReceiveMessage += appHandler_OnReceivedMsg;//接收到消息后处理事件
+            ClientFullHandlerSocket_MSG.ReceiveAsync();
         }
         catch (Exception ex)
         {
@@ -115,10 +115,10 @@ public class ClientOperator
         if (ClientFullHandlerSocket_UPLOAD == null)
         {
             ClientFullHandlerSocket_UPLOAD = new();
-            ClientFullHandlerSocket_UPLOAD.Client.OnUpload += UploadEvent_UploadProcess; // 只挂接上传事件
+            ClientFullHandlerSocket_UPLOAD.OnUpload += UploadEvent_UploadProcess; // 只挂接上传事件
             ClientFullHandlerSocket_UPLOAD.Connect("127.0.0.1", 8000);
             ClientFullHandlerSocket_UPLOAD.LocalFilePath = @"d:\temp";
-            ClientFullHandlerSocket_UPLOAD.ReceiveMessageHead();
+            ClientFullHandlerSocket_UPLOAD.ReceiveAsync();
             ClientFullHandlerSocket_UPLOAD.Login("admin", "password");
         }
         ClientFullHandlerSocket_UPLOAD.DoUpload(localFilePath, "", new FileInfo(localFilePath).Name);
@@ -129,10 +129,10 @@ public class ClientOperator
         if (ClientFullHandlerSoclet_DOWNLOAD == null)
         {
             ClientFullHandlerSoclet_DOWNLOAD = new();
-            ClientFullHandlerSoclet_DOWNLOAD.Client.OnDownload += DownLoadEvent_DownLoadProcess; // 只挂接下载事件
+            ClientFullHandlerSoclet_DOWNLOAD.OnDownload += DownLoadEvent_DownLoadProcess; // 只挂接下载事件
             ClientFullHandlerSoclet_DOWNLOAD.Connect("127.0.0.1", 8000);
             ClientFullHandlerSoclet_DOWNLOAD.LocalFilePath = "download";
-            ClientFullHandlerSoclet_DOWNLOAD.ReceiveMessageHead();
+            ClientFullHandlerSoclet_DOWNLOAD.ReceiveAsync();
             ClientFullHandlerSoclet_DOWNLOAD.Login("admin", "password");
         }
         FileInfo fi = new FileInfo(remoteFilePath);

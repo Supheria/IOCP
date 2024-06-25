@@ -16,7 +16,7 @@ public static class StaticResetevent
     public static AutoResetEvent Done = new AutoResetEvent(false);
 }
 
-partial class IocpClientProtocol()
+partial class IocpClientProtocol
 {
     enum Command
     {
@@ -67,29 +67,14 @@ partial class IocpClientProtocol()
 
     byte[]? ReadBuffer { get; set; } = null;
 
-    // HACK: public void SendMessage(string message)
-    //{
-    //    bool bConnect = ReConnectAndLogin(); //检测连接是否还在，如果断开则重连并登录
-    //    if (!bConnect)
-    //    {
-    //        //Logger.Error("AsyncClientFullHandlerSocket.SendMessage:" + "Socket disconnect");
-    //        throw new Exception("Server is Stoped"); //抛异常是为了让前台知道网络链路的情况         
-    //    }
-    //    else
-    //    {
-    //        CommandComposer.Clear();
-    //        CommandComposer.AddRequest();
-    //        CommandComposer.AddCommand(ProtocolKey.Message);
-    //        byte[] bufferMsg = Encoding.UTF8.GetBytes(message);
-    //        SendCommand(bufferMsg, 0, bufferMsg.Length);
-    //    }
-    //}
+    public UserInfo UserInfo { get; } = new();
+
+    protected string ErrorString { get; set; } = "";
 
     /// <summary>
     /// 向服务端发送消息，由消息来驱动业务逻辑，接收方必须返回应答，否则认为发送失败
     /// </summary>
     /// <param name="msg">消息内容</param>
-
     public void SendMessage(string message)
     {
         CommandComposer.Clear();
@@ -116,11 +101,11 @@ partial class IocpClientProtocol()
     /// <summary>
     /// 循环接收消息
     /// </summary>
-    public void ReceiveMessageHead()
+    public void ReceiveAsync()
     {
         StateObject state = new StateObject();
-        state.workSocket = Client.Core;
-        Client.Core.BeginReceive(ReceiveBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);
+        state.workSocket = Core;
+        Core.BeginReceive(ReceiveBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);
     }
 
     public void ReceiveMessageHeadCallBack(IAsyncResult ar)
@@ -137,7 +122,7 @@ partial class IocpClientProtocol()
             }
             if (length < sizeof(int))//小于四个字节表示包头未完全接收，继续接收
             {
-                Client.Core.BeginReceive(ReceiveBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);
+                Core.BeginReceive(ReceiveBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);
                 return;
             }
             PacketLength = BitConverter.ToInt32(ReceiveBuffer.Buffer, 0); //获取包长度     
@@ -259,7 +244,7 @@ partial class IocpClientProtocol()
         //DoHandleMessage
         if (!string.IsNullOrWhiteSpace(message))
         {
-            Client.HandleReceiveMessage(message);
+            HandleReceiveMessage(message);
         }
     }
 
@@ -342,7 +327,7 @@ partial class IocpClientProtocol()
                     IsSendingFile = false;
                     StaticResetevent.Done.Set();//上传结束 
                     PacketSize = PacketSize / 8;//文件传输时将包大小放大8倍,传输完成后还原为原来大小
-                    Client.HandleUpload();
+                    HandleUpload();
                 }
             }
             else//下载文件
@@ -366,7 +351,7 @@ partial class IocpClientProtocol()
 #endif
 
                     StaticResetevent.Done.Set();//下载完成
-                    Client.HandleDownload();
+                    HandleDownload();
                 }
             }
         }
@@ -471,17 +456,17 @@ partial class IocpClientProtocol()
 
     public bool ReConnectAndLogin()//重新定义，防止使用基类的方法
     {
-        if (BasicFunc.SocketConnected(Client.Core) && (Active()))
+        if (BasicFunc.SocketConnected(Core) && (Active()))
             return true;
         else
         {
-            if (!BasicFunc.SocketConnected(Client.Core))
+            if (!BasicFunc.SocketConnected(Core))
             {
                 try
                 {
                     Disconnect();
                     Connect(Host, Port);
-                    ReceiveMessageHead();
+                    ReceiveAsync();
                     return Login(UserInfo.Id, UserInfo.Password);
                 }
                 catch (Exception E)

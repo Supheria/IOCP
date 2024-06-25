@@ -5,8 +5,6 @@ namespace Net;
 
 public partial class IocpClientProtocol
 {
-    public IocpClient Client { get; } = new();
-
     protected string Host { get; private set; } = "";
 
     protected int Port { get; private set; } = 0;
@@ -45,34 +43,6 @@ public partial class IocpClientProtocol
     //    Client.Core.NoDelay = NoDelay;
     //}
 
-    public void Connect(string host, int port)
-    {
-        try
-        {
-            if (Client.Connect(host, port))
-            {
-                //byte[] socketFlag = [(byte)Type];
-                //Client.Send(Client.Core, [], 0, 0, SocketFlags.None); //发送标识            
-                ////Client.Send(Client.Core, [], 0, 0, SocketFlags.None); //发送标识            
-                Host = host;
-                Port = port;
-            }
-            else
-                throw new Exception("Connection failed");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex.Message);
-        }
-    }
-
-    // TODO: remove this shit and use Client.Disconnect directly
-    public void Disconnect()
-    {
-        Client.Disconnect();
-        //Client = new IocpClient();
-    }
-
     public void SendCommand()
     {
         SendCommand([], 0, 0);
@@ -88,6 +58,6 @@ public partial class IocpClientProtocol
         SendBuffer.WriteInt(bufferUTF8.Length, false); //写入命令大小
         SendBuffer.WriteBuffer(bufferUTF8); //写入命令内容
         SendBuffer.WriteBuffer(buffer, offset, count); //写入二进制数据
-        Client.Send(Client.Core, SendBuffer.Buffer, 0, SendBuffer.DataCount, SocketFlags.None);
+        Send(Core, SendBuffer.Buffer, 0, SendBuffer.DataCount, SocketFlags.None);
     }
 }
