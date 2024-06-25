@@ -15,28 +15,40 @@ public class IocpClient
     /// Create a TCP/IP socket.
     /// </summary>
     public Socket Core { get; set; } = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-    // HACK: public int SendTimeout
-    //{
-    //    get { return Core.SendTimeout; }
-    //    set { Core.SendTimeout = value; }
-    //}
-
-    // HACK: public int TimeoutMilliseconds
-    //{
-    //    get => Core.ReceiveTimeout;
-    //    set
-    //    {
-    //        Core.ReceiveTimeout = value;
-    //    }
-    //}
+    
+    public int TimeoutMilliseconds
+    {
+        get => Core.ReceiveTimeout;
+        set
+        {
+            Core.ReceiveTimeout = value;
+            Core.SendTimeout = value;       
+        }
+    }
 
     public delegate void HandleMessage(string message);
+
     public event HandleMessage? OnReceiveMessage;
 
     public void HandleReceiveMessage(string message)
     {
         new Task(() => OnReceiveMessage?.Invoke(message)).Start();
+    }
+
+    public delegate void HandleProcess();
+
+    public event HandleProcess? OnDownload;
+
+    public void HandleDownload()
+    {
+        new Task(() => OnDownload?.Invoke()).Start();
+    }
+
+    public event HandleProcess? OnUpload;
+
+    public void HandleUpload()
+    {
+        new Task(() => OnUpload?.Invoke()).Start();
     }
 
     public bool Connect(string host, int port)

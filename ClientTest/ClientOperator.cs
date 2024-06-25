@@ -13,8 +13,6 @@ public class ClientOperator
     public ClientOperator(string name)
     {
         Name = name;
-        DownLoadEvent.downLoadProcess += new DownloadEvent.DownLoadProcess(DownLoadEvent_DownLoadProcess);
-        UploadEvent.uploadProcess += new UploadEvent.UploadProcess(UploadEvent_UploadProcess);
     }
 
     string Name { get; }
@@ -29,16 +27,6 @@ public class ClientOperator
 
     IocpClientProtocol ClientFullHandlerSoclet_DOWNLOAD { get; set; }
 
-    /// <summary>
-    /// 下载完成事件
-    /// </summary>
-    DownloadEvent DownLoadEvent { get; } = new();
-
-    /// <summary>
-    /// 上传完成事件
-    /// </summary>
-    UploadEvent UploadEvent { get; } = new();
-
     void UploadEvent_UploadProcess()
     {
         OnUpdateMessage?.Invoke($"{Name}: 文件上传完成");
@@ -51,7 +39,7 @@ public class ClientOperator
 
     public void Connet(string ipAddress, int port)
     {
-        ClientFullHandlerSocket_MSG = new(null, null);//消息发送不需要挂接事件
+        ClientFullHandlerSocket_MSG = new(); // 消息发送不需要挂接事件
         //ClientFullHandlerSocket_MSG.SetNoDelay(true);
         try
         {
@@ -126,7 +114,8 @@ public class ClientOperator
     {
         if (ClientFullHandlerSocket_UPLOAD == null)
         {
-            ClientFullHandlerSocket_UPLOAD = new(null, UploadEvent);//只挂接上传事件
+            ClientFullHandlerSocket_UPLOAD = new();
+            ClientFullHandlerSocket_UPLOAD.Client.OnUpload += UploadEvent_UploadProcess; // 只挂接上传事件
             ClientFullHandlerSocket_UPLOAD.Connect("127.0.0.1", 8000);
             ClientFullHandlerSocket_UPLOAD.LocalFilePath = @"d:\temp";
             ClientFullHandlerSocket_UPLOAD.ReceiveMessageHead();
@@ -139,7 +128,8 @@ public class ClientOperator
     {
         if (ClientFullHandlerSoclet_DOWNLOAD == null)
         {
-            ClientFullHandlerSoclet_DOWNLOAD = new(DownLoadEvent, null);//只挂接下载事件
+            ClientFullHandlerSoclet_DOWNLOAD = new();
+            ClientFullHandlerSoclet_DOWNLOAD.Client.OnDownload += DownLoadEvent_DownLoadProcess; // 只挂接下载事件
             ClientFullHandlerSoclet_DOWNLOAD.Connect("127.0.0.1", 8000);
             ClientFullHandlerSoclet_DOWNLOAD.LocalFilePath = "download";
             ClientFullHandlerSoclet_DOWNLOAD.ReceiveMessageHead();

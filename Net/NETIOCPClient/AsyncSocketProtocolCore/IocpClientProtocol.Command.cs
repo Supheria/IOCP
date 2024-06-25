@@ -15,43 +15,8 @@ public static class StaticResetevent
 {
     public static AutoResetEvent Done = new AutoResetEvent(false);
 }
-public class DownLoadPara
-{
-    public string dir = "";
-    public string name = "";
-    public string filetype { get; set; }
-}
-public class DownloadEvent
-{
-    public List<DownLoadPara> ListQueue;
-    public delegate void DownLoadProcess();
-    public event DownLoadProcess downLoadProcess;
-    public void OnProcessDownLoad()
-    {
-        if (downLoadProcess != null)
-        {
-            downLoadProcess();
-        }
-    }
-    public DownloadEvent()
-    {
-        ListQueue = new List<DownLoadPara>();
-    }
-}
-public class UploadEvent
-{
-    public delegate void UploadProcess();
-    public event UploadProcess uploadProcess;
-    public void OnProcessUpload()
-    {
-        if (uploadProcess != null)
-        {
-            uploadProcess();
-        }
-    }
-}
 
-partial class IocpClientProtocol(DownloadEvent downloadEvent, UploadEvent uploadEvent)
+partial class IocpClientProtocol()
 {
     enum Command
     {
@@ -101,16 +66,6 @@ partial class IocpClientProtocol(DownloadEvent downloadEvent, UploadEvent upload
     bool IsSendingFile { get; set; } = false;
 
     byte[]? ReadBuffer { get; set; } = null;
-
-    /// <summary>
-    /// 下载完成后的事件
-    /// </summary>
-    DownloadEvent? DownloadEvent { get; } = downloadEvent;
-
-    /// <summary>
-    /// 上传完成后的事件
-    /// </summary>
-    UploadEvent? UploadEvent { get; } = uploadEvent;
 
     // HACK: public void SendMessage(string message)
     //{
@@ -387,7 +342,7 @@ partial class IocpClientProtocol(DownloadEvent downloadEvent, UploadEvent upload
                     IsSendingFile = false;
                     StaticResetevent.Done.Set();//上传结束 
                     PacketSize = PacketSize / 8;//文件传输时将包大小放大8倍,传输完成后还原为原来大小
-                    UploadEvent.OnProcessUpload();
+                    Client.HandleUpload();
                 }
             }
             else//下载文件
@@ -411,10 +366,7 @@ partial class IocpClientProtocol(DownloadEvent downloadEvent, UploadEvent upload
 #endif
 
                     StaticResetevent.Done.Set();//下载完成
-                    if (DownloadEvent != null)
-                    {
-                        DownloadEvent.OnProcessDownLoad();
-                    }
+                    Client.HandleDownload();
                 }
             }
         }
