@@ -76,7 +76,7 @@ public partial class IocpServerProtocol
         if (!SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
             return;
         IsSendingAsync = true;
-        SendAsync(packetOffset, packetCount);
+        SendAsync(SendBuffer.DynamicBufferManager.Buffer, packetOffset, packetCount);
         return;
     }
 

@@ -9,8 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="NETIOCPClient\AsyncSocketCore\**" />
     <Compile Remove="NETIOCPServer\AsyncSocketProtocolCore\**" />
+    <EmbeddedResource Remove="NETIOCPClient\AsyncSocketCore\**" />
     <EmbeddedResource Remove="NETIOCPServer\AsyncSocketProtocolCore\**" />
+    <None Remove="NETIOCPClient\AsyncSocketCore\**" />
     <None Remove="NETIOCPServer\AsyncSocketProtocolCore\**" />
   </ItemGroup>
 
@@ -28,10 +31,6 @@
     <Compile Update="ClientDemo\Client.cs">
       <SubType>Form</SubType>
     </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="NETIOCPClient\AsyncSocketCore\" />
   </ItemGroup>
 
 </Project>

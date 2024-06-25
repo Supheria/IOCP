@@ -5,15 +5,11 @@ using System.Text;
 
 namespace Net;
 
-partial class IocpServerProtocol
+partial class IocpServerProtocol(IocpServer server)
 {
-    IocpServer Server { get; }
+    IocpServer Server { get; } = server;
 
     Socket? Socket { get; set; } = null;
-
-    SocketAsyncEventArgs ReceiveAsyncArgs { get; } = new();
-
-    SocketAsyncEventArgs SendAsyncArgs { get; } = new();
     
     DynamicBufferManager ReceiveBuffer { get; } = new(ConstTabel.InitBufferSize);
     
@@ -27,14 +23,6 @@ partial class IocpServerProtocol
 
     object Locker { get; } = new();
 
-    public IocpServerProtocol(IocpServer server)
-    {
-        Server = server;
-        ReceiveAsyncArgs.SetBuffer(new byte[ReceiveBuffer.BufferSize], 0, ReceiveBuffer.BufferSize);
-        ReceiveAsyncArgs.Completed += (_, _) => ProcessReceive();
-        SendAsyncArgs.Completed += (_, _) => ProcessSend();
-    }
-
     [MemberNotNullWhen(true, nameof(Socket))]
     public bool ProcessAccept(Socket? acceptSocket)
     {
@@ -43,8 +31,6 @@ partial class IocpServerProtocol
         Socket = acceptSocket;
         // 设置TCP Keep-alive数据包的发送间隔为10秒
         Socket.IOControl(IOControlCode.KeepAliveValues, KeepAlive(1, 1000 * 10, 1000 * 10), null);
-        ReceiveAsyncArgs.AcceptSocket = acceptSocket;
-        SendAsyncArgs.AcceptSocket = acceptSocket;
         SocketInfo.Connect(acceptSocket);
         return true;
     }
@@ -79,7 +65,7 @@ partial class IocpServerProtocol
         }
         Socket.Close();
         Socket = null;
-        ReceiveBuffer.Clear(ReceiveBuffer.DataCount);
+        ReceiveBuffer.Clear();
         SendBuffer.ClearPacket();
         Dispose();
         SocketInfo.Disconnect();
@@ -89,30 +75,14 @@ partial class IocpServerProtocol
 
     public void ReceiveAsync()
     {
-        if (Socket is not null && !Socket.ReceiveAsync(ReceiveAsyncArgs))
+        var receiveArgs = new SocketAsyncEventArgs();
+        receiveArgs.SetBuffer(new byte[ReceiveBuffer.BufferSize], 0, ReceiveBuffer.BufferSize);
+        receiveArgs.Completed += (_, args) => ProcessReceive(args);
+        if (Socket is not null && !Socket.ReceiveAsync(receiveArgs))
         {
             lock (Locker)
-                ProcessReceive();
+                ProcessReceive(receiveArgs);
         }
-    }
-
-    public void ProcessReceive()
-    {
-        if (Socket is null)
-            return;
-        if (ReceiveAsyncArgs.Buffer is null || ReceiveAsyncArgs.BytesTransferred <= 0 || ReceiveAsyncArgs.SocketError is not SocketError.Success)
-            goto CLOSE;
-        var offset = ReceiveAsyncArgs.Offset;
-        var count = ReceiveAsyncArgs.BytesTransferred;
-        SocketInfo.Active();
-        if (count > 0 && !ReceiveComplete(ReceiveAsyncArgs.Buffer, offset, count))
-            goto CLOSE;
-        if (!Socket.ReceiveAsync(ReceiveAsyncArgs))
-            ProcessReceive();
-        return;
-    CLOSE:
-        // 接收数据长度为0或者SocketError 不等于 SocketError.Success表示socket已经断开，所以服务端执行断开清理工作
-        Close();
     }
 
     /// <summary>
@@ -122,29 +92,37 @@ partial class IocpServerProtocol
     /// <param name="offset"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    public virtual bool ReceiveComplete(byte[] buffer, int offset, int count)
+    private void ProcessReceive(SocketAsyncEventArgs receiveArgs)
     {
+        if (Socket is null ||
+            receiveArgs.Buffer is null ||
+            receiveArgs.BytesTransferred <= 0 ||
+            receiveArgs.SocketError is not SocketError.Success)
+            goto CLOSE;
         SocketInfo.Active();
-        ReceiveBuffer.WriteBuffer(buffer, offset, count);
+        ReceiveBuffer.WriteBuffer(receiveArgs.Buffer!, receiveArgs.Offset, receiveArgs.BytesTransferred);
         while (ReceiveBuffer.DataCount > sizeof(int))
         {
             // 按照长度分包
             // 获取包长度
-            int packetLength = BitConverter.ToInt32(ReceiveBuffer.Buffer, 0);
+            var packetLength = BitConverter.ToInt32(ReceiveBuffer.Buffer, 0);
             if (UseNetByteOrder) // 把网络字节顺序转为本地字节顺序
                 packetLength = IPAddress.NetworkToHostOrder(packetLength);
             // 最大Buffer异常保护
             if ((packetLength > 10 * 1024 * 1024) | (ReceiveBuffer.DataCount > 10 * 1024 * 1024))
-                return false;
+                goto CLOSE;
             // 收到的数据没有达到包长度，继续接收
             if (ReceiveBuffer.DataCount < packetLength)
-                return true;
-            if (HandlePacket(ReceiveBuffer.Buffer, sizeof(int), packetLength))
-                ReceiveBuffer.Clear(packetLength); // 从缓存中清理
-            else
-                return false;
+                goto RECEIVE;
+            HandlePacket(ReceiveBuffer.Buffer, sizeof(int), packetLength);
+            ReceiveBuffer.Clear(packetLength);
         }
-        return true;
+    RECEIVE:
+        ReceiveAsync();
+        return;
+    CLOSE:
+        Close();
+        return;
     }
 
     /// <summary>
@@ -154,7 +132,7 @@ partial class IocpServerProtocol
     /// <param name="offset"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    protected virtual bool HandlePacket(byte[] buffer, int offset, int count)
+    private bool HandlePacket(byte[] buffer, int offset, int count)
     {
         if (count < sizeof(int))
             return false;
@@ -165,34 +143,33 @@ partial class IocpServerProtocol
         return ProcessCommand(buffer, offset + sizeof(int) + length, count - sizeof(int) - sizeof(int) - length); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - length，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
     }
 
-    public void SendAsync(int offset, int count)
+    public void SendAsync(byte[] buffer, int offset, int count)
     {
         if (Socket is null)
             return;
-        SendAsyncArgs.SetBuffer(SendBuffer.DynamicBufferManager.Buffer, offset, count);
-        if (!Socket.SendAsync(SendAsyncArgs))
-            new Task(() => ProcessSend()).Start();
+        var sendArgs = new SocketAsyncEventArgs();
+        sendArgs.SetBuffer(buffer, offset, count);
+        sendArgs.Completed += (_, args) => ProcessSend(args);
+        if (!Socket.SendAsync(sendArgs))
+            new Task(() => ProcessSend(sendArgs)).Start();
     }
 
-    public void ProcessSend()
+    public void ProcessSend(SocketAsyncEventArgs sendArgs)
     {
         SocketInfo.Active();
         // 调用子类回调函数
-        if (SendAsyncArgs.SocketError is SocketError.Success)
-            SendComplete();
-        else
+        if (sendArgs.SocketError is not SocketError.Success)
+        {
             Close();
-    }
-
-    public void SendComplete()
-    {
+            return;
+        }
         SocketInfo.Active();
         IsSendingAsync = false;
         SendBuffer.ClearFirstPacket(); // 清除已发送的包
         if (SendBuffer.GetFirstPacket(out var offset, out var count))
         {
             IsSendingAsync = true;
-            SendAsync(offset, count);
+            SendAsync(SendBuffer.DynamicBufferManager.Buffer, offset, count);
         }
         else
             SendCallback();
