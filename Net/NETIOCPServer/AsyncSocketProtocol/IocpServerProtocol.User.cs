@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Net;
 using System.Net.Sockets;
+using System.Text;
 
 namespace Net;
 
@@ -103,7 +105,7 @@ partial class IocpServerProtocol
         var offset = ReceiveAsyncArgs.Offset;
         var count = ReceiveAsyncArgs.BytesTransferred;
         SocketInfo.Active();
-        if (count > 0 && !ProcessReceive(ReceiveAsyncArgs.Buffer, offset, count))
+        if (count > 0 && !ReceiveComplete(ReceiveAsyncArgs.Buffer, offset, count))
             goto CLOSE;
         if (!Socket.ReceiveAsync(ReceiveAsyncArgs))
             ProcessReceive();
@@ -111,6 +113,56 @@ partial class IocpServerProtocol
     CLOSE:
         // 接收数据长度为0或者SocketError 不等于 SocketError.Success表示socket已经断开，所以服务端执行断开清理工作
         Close();
+    }
+
+    /// <summary>
+    /// 接收异步事件返回的数据，用于对数据进行缓存和分包
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="offset"></param>
+    /// <param name="count"></param>
+    /// <returns></returns>
+    public virtual bool ReceiveComplete(byte[] buffer, int offset, int count)
+    {
+        SocketInfo.Active();
+        ReceiveBuffer.WriteBuffer(buffer, offset, count);
+        while (ReceiveBuffer.DataCount > sizeof(int))
+        {
+            // 按照长度分包
+            // 获取包长度
+            int packetLength = BitConverter.ToInt32(ReceiveBuffer.Buffer, 0);
+            if (UseNetByteOrder) // 把网络字节顺序转为本地字节顺序
+                packetLength = IPAddress.NetworkToHostOrder(packetLength);
+            // 最大Buffer异常保护
+            if ((packetLength > 10 * 1024 * 1024) | (ReceiveBuffer.DataCount > 10 * 1024 * 1024))
+                return false;
+            // 收到的数据没有达到包长度，继续接收
+            if (ReceiveBuffer.DataCount < packetLength)
+                return true;
+            if (HandlePacket(ReceiveBuffer.Buffer, sizeof(int), packetLength))
+                ReceiveBuffer.Clear(packetLength); // 从缓存中清理
+            else
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// 处理分完包后的数据，把命令和数据分开，并对命令进行解析
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="offset"></param>
+    /// <param name="count"></param>
+    /// <returns></returns>
+    protected virtual bool HandlePacket(byte[] buffer, int offset, int count)
+    {
+        if (count < sizeof(int))
+            return false;
+        var length = BitConverter.ToInt32(buffer, offset); //取出命令长度
+        var command = Encoding.UTF8.GetString(buffer, offset + sizeof(int), length);
+        if (!CommandParser.DecodeProtocolText(command)) //解析命令
+            return false;
+        return ProcessCommand(buffer, offset + sizeof(int) + length, count - sizeof(int) - sizeof(int) - length); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - length，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
     }
 
     public void SendAsync(int offset, int count)

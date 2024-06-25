@@ -127,7 +127,7 @@ public class ClientOperator
             ClientFullHandlerSocket_UPLOAD.ReceiveAsync();
             ClientFullHandlerSocket_UPLOAD.Login("admin", "password");
         }
-        ClientFullHandlerSocket_UPLOAD.DoUpload(localFilePath, "", new FileInfo(localFilePath).Name);
+        ClientFullHandlerSocket_UPLOAD.Upload(localFilePath, "", new FileInfo(localFilePath).Name);
     }
 
     public void DownloadFile(string remoteFilePath)
@@ -142,7 +142,7 @@ public class ClientOperator
             ClientFullHandlerSoclet_DOWNLOAD.Login("admin", "password");
         }
         FileInfo fi = new FileInfo(remoteFilePath);
-        ClientFullHandlerSoclet_DOWNLOAD.DoDownload(fi.DirectoryName, fi.Name, fi.DirectoryName.Substring(fi.DirectoryName.LastIndexOf("\\", StringComparison.Ordinal)));
+        ClientFullHandlerSoclet_DOWNLOAD.Download(fi.DirectoryName, fi.Name, fi.DirectoryName.Substring(fi.DirectoryName.LastIndexOf("\\", StringComparison.Ordinal)));
 
     }
 }

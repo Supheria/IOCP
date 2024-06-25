@@ -102,7 +102,7 @@ namespace ClientDemo
                 ClientFullHandlerSocket_UPLOAD.ReceiveAsync();
                 ClientFullHandlerSocket_UPLOAD.Login("admin", "password");
             }
-            ClientFullHandlerSocket_UPLOAD.DoUpload(fileFullPath, "", new FileInfo(fileFullPath).Name);
+            ClientFullHandlerSocket_UPLOAD.Upload(fileFullPath, "", new FileInfo(fileFullPath).Name);
         }
 
 
@@ -137,7 +137,7 @@ namespace ClientDemo
                 ClientFullHandlerSoclet_DOWNLOAD.Login("admin", "password");
             }
             FileInfo fi = new FileInfo(remoteFileFullPath);
-            ClientFullHandlerSoclet_DOWNLOAD.DoDownload(fi.DirectoryName, fi.Name, fi.DirectoryName.Substring(fi.DirectoryName.LastIndexOf("\\", StringComparison.Ordinal)));
+            ClientFullHandlerSoclet_DOWNLOAD.Download(fi.DirectoryName, fi.Name, fi.DirectoryName.Substring(fi.DirectoryName.LastIndexOf("\\", StringComparison.Ordinal)));
         }
 
 
