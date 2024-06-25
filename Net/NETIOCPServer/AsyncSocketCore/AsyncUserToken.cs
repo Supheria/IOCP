@@ -118,8 +118,8 @@ public class AsyncUserToken
         {
             if (BuildProtocol())
             {
-                offset++;
-                count--;
+                //offset++;
+                //count--;
             }
             else
                 goto CLOSE;
@@ -140,12 +140,12 @@ public class AsyncUserToken
     {
         if (AcceptSocket is null || ReceiveAsyncArgs.Buffer is null)
             return false;
-        var protocolType = (IocpProtocolTypes)ReceiveAsyncArgs.Buffer[ReceiveAsyncArgs.Offset];
-        Protocol = protocolType switch
-        {
-            IocpProtocolTypes.FullHandler => new IocpServerProtocol(Server, this),
-            _ => null
-        };
+        Protocol = new IocpServerProtocol(Server, this);
+        //Protocol = protocolType switch
+        //{
+        //    IocpProtocolTypes.FullHandler => new IocpServerProtocol(Server, this),
+        //    _ => null
+        //};
         if (Protocol is not null)
         {
             //ServerInstance.Logger.InfoFormat("Building socket invoke element {0}.Local Address: {1}, Remote Address: {2}",

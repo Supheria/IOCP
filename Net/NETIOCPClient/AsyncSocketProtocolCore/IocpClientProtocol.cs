@@ -55,8 +55,9 @@ public abstract partial class IocpClientProtocol(IocpProtocolTypes type)
         {
             if (Client.Connect(host, port))
             {
-                byte[] socketFlag = [(byte)Type];
-                Client.Send(Client.Core, socketFlag, 0, 1, SocketFlags.None); //发送标识            
+                //byte[] socketFlag = [(byte)Type];
+                //Client.Send(Client.Core, [], 0, 0, SocketFlags.None); //发送标识            
+                ////Client.Send(Client.Core, [], 0, 0, SocketFlags.None); //发送标识            
                 Host = host;
                 Port = port;
             }
