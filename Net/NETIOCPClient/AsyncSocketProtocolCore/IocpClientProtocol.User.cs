@@ -7,12 +7,6 @@ namespace Net;
 
 partial class IocpClientProtocol
 {
-    // HACK: public static ILog Logger;
-
-    public static ManualResetEvent ConnectDone { get; } = new(false);
-
-    public static ManualResetEvent SendDone { get; } = new(false);
-
     SocketAsyncEventArgs ReceiveAsyncArgs { get; } = new();
 
     SocketAsyncEventArgs SendAsyncArgs { get; } = new();
@@ -30,20 +24,18 @@ partial class IocpClientProtocol
     /// </summary>
     bool IsSendingAsync { get; set; } = false;
 
-
-
     /// <summary>
     /// Create a TCP/IP socket.
     /// </summary>
-    public Socket Core { get; set; } = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+    public Socket Socket { get; set; } = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
     public int TimeoutMilliseconds
     {
-        get => Core.ReceiveTimeout;
+        get => Socket.ReceiveTimeout;
         set
         {
-            Core.ReceiveTimeout = value;
-            Core.SendTimeout = value;
+            Socket.ReceiveTimeout = value;
+            Socket.SendTimeout = value;
         }
     }
 
@@ -64,7 +56,7 @@ partial class IocpClientProtocol
                 RemoteEndPoint = getIpAddress()
             };
             connectArgs.Completed += (_, args) => ProcessConnect(args);
-            if (!Core.ConnectAsync(connectArgs))
+            if (!Socket.ConnectAsync(connectArgs))
                 ProcessConnect(connectArgs);
             //Core.BeginConnect(getIpAddress(), new AsyncCallback(ConnectCallback), Core);
             //ConnectDone.WaitOne();
@@ -97,13 +89,13 @@ partial class IocpClientProtocol
             return;
         try
         {
-            Core.Shutdown(SocketShutdown.Both);
+            Socket.Shutdown(SocketShutdown.Both);
         }
         catch (Exception ex)
         {
             //Program.Logger.ErrorFormat("CloseClientSocket Disconnect client {0} error, message: {1}", socketInfo, ex.Message);
         }
-        Core.Close();
+        Socket.Close();
     }
 
     private void ProcessConnect(SocketAsyncEventArgs connectArgs)
@@ -120,7 +112,7 @@ partial class IocpClientProtocol
     public void SendAsync(int offset, int count)
     {
         SendAsyncArgs.SetBuffer(SendBuffer.DynamicBufferManager.Buffer, offset, count);
-        if (!Core.SendAsync(SendAsyncArgs))
+        if (!Socket.SendAsync(SendAsyncArgs))
             new Task(() => ProcessSend()).Start();
     }
 
@@ -147,15 +139,6 @@ partial class IocpClientProtocol
         //else
         //    SendCallback();
     }
-
-    //public IocpClientProtocol()
-    //    : base()
-    //{
-    //    DateTime currentTime = DateTime.Now;
-    //    log4net.GlobalContext.Properties["LogDir"] = currentTime.ToString("yyyyMM");
-    //    log4net.GlobalContext.Properties["LogFileName"] = "_SocketAsyncServer" + currentTime.ToString("yyyyMMdd");
-    //    Logger = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
-    //}
 
     public bool CheckErrorCode()
     {
@@ -185,29 +168,6 @@ partial class IocpClientProtocol
             //ErrorString = E.Message;
             //Logger.Error(E.Message);
             return false;
-        }
-    }
-
-    public bool ReConnect()
-    {
-        if (BasicFunc.SocketConnected(Core) && (Active()))
-            return true;
-        else
-        {
-            if (!BasicFunc.SocketConnected(Core))
-            {
-                try
-                {
-                    Connect(Host, Port);
-                    return true;
-                }
-                catch (Exception)
-                {
-                    return false;
-                }
-            }
-            else
-                return true;
         }
     }
 

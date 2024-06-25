@@ -5,7 +5,7 @@ namespace Net;
 
 public class IocpServer
 {
-    Socket? Core { get; set; } = null;
+    Socket? Socket { get; set; } = null;
 
     public bool IsStart { get; private set; } = false;
 
@@ -96,7 +96,7 @@ public class IocpServer
     /// 
     public void SetNoDelay(bool NoDelay)
     {
-        Core.NoDelay = NoDelay;
+        Socket.NoDelay = NoDelay;
     }
 
     public void Start(int port)
@@ -108,9 +108,9 @@ public class IocpServer
         }
         // 使用0.0.0.0作为绑定IP，则本机所有的IPv4地址都将绑定
         var localEndPoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), port);
-        Core = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        Core.Bind(localEndPoint);
-        Core.Listen(ParallelCountMax);
+        Socket = new Socket(localEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        Socket.Bind(localEndPoint);
+        Socket.Listen(ParallelCountMax);
         //ServerInstance.Logger.InfoFormat("Start listen socket {0} success", localEndPoint.ToString());
         //for (int i = 0; i < 64; i++) //不能循环投递多次AcceptAsync，会造成只接收8000连接后不接收连接了
         StartAccept(null);
@@ -129,7 +129,7 @@ public class IocpServer
         foreach (var protocol in userTokens)//双向关闭已存在的连接
             protocol.Close();
         ProtocolList.Clear();
-        Core?.Close();
+        Socket?.Close();
         DaemonThread.Stop();
         IsStart = false;
         //ServerInstance.Logger.Info("Server is Stoped");
@@ -146,7 +146,7 @@ public class IocpServer
         {
             acceptArgs.AcceptSocket = null; //释放上次绑定的Socket，等待下一个Socket连接
         }
-        if (Core is not null && !Core.AcceptAsync(acceptArgs))
+        if (Socket is not null && !Socket.AcceptAsync(acceptArgs))
             ProcessAccept(acceptArgs);
     }
 

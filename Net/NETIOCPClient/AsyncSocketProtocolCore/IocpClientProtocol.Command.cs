@@ -104,8 +104,8 @@ partial class IocpClientProtocol
     public void ReceiveAsync()
     {
         StateObject state = new StateObject();
-        state.workSocket = Core;
-        Core.BeginReceive(ReceiveBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);
+        state.workSocket = Socket;
+        Socket.BeginReceive(ReceiveBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);
     }
 
     public void ReceiveMessageHeadCallBack(IAsyncResult ar)
@@ -122,7 +122,7 @@ partial class IocpClientProtocol
             }
             if (length < sizeof(int))//小于四个字节表示包头未完全接收，继续接收
             {
-                Core.BeginReceive(ReceiveBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);
+                Socket.BeginReceive(ReceiveBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);
                 return;
             }
             PacketLength = BitConverter.ToInt32(ReceiveBuffer.Buffer, 0); //获取包长度     
@@ -456,11 +456,11 @@ partial class IocpClientProtocol
 
     public bool ReConnectAndLogin()//重新定义，防止使用基类的方法
     {
-        if (BasicFunc.SocketConnected(Core) && (Active()))
+        if (BasicFunc.SocketConnected(Socket) && (Active()))
             return true;
         else
         {
-            if (!BasicFunc.SocketConnected(Core))
+            if (!BasicFunc.SocketConnected(Socket))
             {
                 try
                 {

@@ -7,7 +7,7 @@ partial class IocpServerProtocol
 {
     IocpServer Server { get; }
 
-    Socket? AcceptSocket { get; set; } = null;
+    Socket? Socket { get; set; } = null;
 
     SocketAsyncEventArgs ReceiveAsyncArgs { get; } = new();
 
@@ -33,14 +33,14 @@ partial class IocpServerProtocol
         SendAsyncArgs.Completed += (_, _) => ProcessSend();
     }
 
-    [MemberNotNullWhen(true, nameof(AcceptSocket))]
+    [MemberNotNullWhen(true, nameof(Socket))]
     public bool ProcessAccept(Socket? acceptSocket)
     {
         if (acceptSocket is null)
             return false;
-        AcceptSocket = acceptSocket;
+        Socket = acceptSocket;
         // 设置TCP Keep-alive数据包的发送间隔为10秒
-        AcceptSocket.IOControl(IOControlCode.KeepAliveValues, KeepAlive(1, 1000 * 10, 1000 * 10), null);
+        Socket.IOControl(IOControlCode.KeepAliveValues, KeepAlive(1, 1000 * 10, 1000 * 10), null);
         ReceiveAsyncArgs.AcceptSocket = acceptSocket;
         SendAsyncArgs.AcceptSocket = acceptSocket;
         SocketInfo.Connect(acceptSocket);
@@ -65,18 +65,18 @@ partial class IocpServerProtocol
 
     public bool Close()
     {
-        if (AcceptSocket is null)
+        if (Socket is null)
             return false;
         try
         {
-            AcceptSocket.Shutdown(SocketShutdown.Both);
+            Socket.Shutdown(SocketShutdown.Both);
         }
         catch (Exception ex)
         {
             //Program.Logger.ErrorFormat("CloseClientSocket Disconnect client {0} error, message: {1}", socketInfo, ex.Message);
         }
-        AcceptSocket.Close();
-        AcceptSocket = null;
+        Socket.Close();
+        Socket = null;
         ReceiveBuffer.Clear(ReceiveBuffer.DataCount);
         SendBuffer.ClearPacket();
         Dispose();
@@ -87,7 +87,7 @@ partial class IocpServerProtocol
 
     public void ReceiveAsync()
     {
-        if (AcceptSocket is not null && !AcceptSocket.ReceiveAsync(ReceiveAsyncArgs))
+        if (Socket is not null && !Socket.ReceiveAsync(ReceiveAsyncArgs))
         {
             lock (Locker)
                 ProcessReceive();
@@ -96,7 +96,7 @@ partial class IocpServerProtocol
 
     public void ProcessReceive()
     {
-        if (AcceptSocket is null)
+        if (Socket is null)
             return;
         if (ReceiveAsyncArgs.Buffer is null || ReceiveAsyncArgs.BytesTransferred <= 0 || ReceiveAsyncArgs.SocketError is not SocketError.Success)
             goto CLOSE;
@@ -105,7 +105,7 @@ partial class IocpServerProtocol
         SocketInfo.Active();
         if (count > 0 && !ProcessReceive(ReceiveAsyncArgs.Buffer, offset, count))
             goto CLOSE;
-        if (!AcceptSocket.ReceiveAsync(ReceiveAsyncArgs))
+        if (!Socket.ReceiveAsync(ReceiveAsyncArgs))
             ProcessReceive();
         return;
     CLOSE:
@@ -115,10 +115,10 @@ partial class IocpServerProtocol
 
     public void SendAsync(int offset, int count)
     {
-        if (AcceptSocket is null)
+        if (Socket is null)
             return;
         SendAsyncArgs.SetBuffer(SendBuffer.DynamicBufferManager.Buffer, offset, count);
-        if (!AcceptSocket.SendAsync(SendAsyncArgs))
+        if (!Socket.SendAsync(SendAsyncArgs))
             new Task(() => ProcessSend()).Start();
     }
 
@@ -130,5 +130,61 @@ partial class IocpServerProtocol
             SendComplete();
         else
             Close();
+    }
+
+    public void SendComplete()
+    {
+        SocketInfo.Active();
+        IsSendingAsync = false;
+        SendBuffer.ClearFirstPacket(); // 清除已发送的包
+        if (SendBuffer.GetFirstPacket(out var offset, out var count))
+        {
+            IsSendingAsync = true;
+            SendAsync(offset, count);
+        }
+        else
+            SendCallback();
+    }
+
+    /// <summary>
+    /// 发送回调函数，用于连续下发数据
+    /// </summary>
+    /// <returns></returns>
+    private void SendCallback()
+    {
+        if (FileStream is null)
+            return;
+        if (IsSendingFile) // 发送文件头
+        {
+            CommandComposer.Clear();
+            CommandComposer.AddResponse();
+            CommandComposer.AddCommand(ProtocolKey.SendFile);
+            _ = CommandSucceed((ProtocolKey.FileSize, FileStream.Length - FileStream.Position));
+            IsSendingFile = false;
+            return;
+        }
+        if (IsReceivingFile)
+            return;
+        // 没有接收文件时
+        // 发送具体数据,加FileStream.CanSeek是防止上传文件结束后，文件流被释放而出错
+        if (FileStream.CanSeek && FileStream.Position < FileStream.Length)
+        {
+            CommandComposer.Clear();
+            CommandComposer.AddResponse();
+            CommandComposer.AddCommand(ProtocolKey.Data);
+            ReadBuffer ??= new byte[PacketSize];
+            // 避免多次申请内存
+            if (ReadBuffer.Length < PacketSize)
+                ReadBuffer = new byte[PacketSize];
+            var count = FileStream.Read(ReadBuffer, 0, PacketSize);
+            _ = CommandSucceed(ReadBuffer, 0, count);
+            return;
+        }
+        // 发送完成
+        //ServerInstance.Logger.Info("End Upload file: " + FilePath);
+        FileStream.Close();
+        FileStream = null;
+        FilePath = "";
+        IsSendingFile = false;
     }
 }
