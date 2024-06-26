@@ -12,7 +12,7 @@ public partial class IocpClientProtocol
     /// <summary>
     /// 长度是否使用网络字节顺序
     /// </summary>
-    public bool NetByteOrder { get; set; } = false;
+    public bool UseNetByteOrder { get; set; } = false;
 
     /// <summary>
     /// 协议组装器，用来组装往外发送的命令

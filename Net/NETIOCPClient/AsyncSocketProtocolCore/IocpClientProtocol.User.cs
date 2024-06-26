@@ -9,10 +9,6 @@ namespace Net;
 
 partial class IocpClientProtocol
 {
-    //SocketAsyncEventArgs ReceiveAsyncArgs { get; } = new();
-
-    //SocketAsyncEventArgs SendAsyncArgs { get; } = new();
-
     public SocketInfo SocketInfo { get; } = new();
 
     bool IsConnect { get; set; } = false;
@@ -43,11 +39,7 @@ partial class IocpClientProtocol
 
     object Locker { get; } = new();
 
-    public IocpClientProtocol()
-    {
-        //ReceiveAsyncArgs.Completed += (_, _) => ProcessReceive();
-        //SendAsyncArgs.Completed += (_, _) => ProcessSend();
-    }
+    object CloseLocker { get; } = new();
 
     public void Connect(string host, int port)
     {
@@ -95,137 +87,86 @@ partial class IocpClientProtocol
             Socket?.Dispose();
             return;
         }
-        //ReceiveAsyncArgs.AcceptSocket = connectArgs.ConnectSocket;
-        //SendAsyncArgs.AcceptSocket = connectArgs.ConnectSocket;
         new Task(() => OnConnect?.Invoke(this)).Start();
         SocketInfo.Connect(connectArgs.ConnectSocket);
         IsConnect = true;
     }
 
+    ManualResetEvent CloseDone { get; } = new(true);
+
     public void Close()
     {
-        if (Socket is null || !IsConnect)
-            return;
-        try
+        //CloseDone.WaitOne();
+        //CloseDone.Reset();
+        lock (CloseDone)
         {
-            Socket.Shutdown(SocketShutdown.Both);
+            if (Socket is null || !IsConnect)
+            {
+                //CloseDone.Set();
+                return;
+            }
+            try
+            {
+                Socket.Shutdown(SocketShutdown.Both);
+            }
+            catch (Exception ex)
+            {
+                //Program.Logger.ErrorFormat("CloseClientSocket Disconnect client {0} error, message: {1}", socketInfo, ex.Message);
+            }
+            ReceiveBuffer.Clear();
+            SendBuffer.ClearPacket();
+            // TODO: Dispose
+            Socket.Close();
+            Socket = null;
+            SocketInfo.Disconnect();
+            IsConnect = false;
+            //CloseDone.Set();
         }
-        catch (Exception ex)
-        {
-            //Program.Logger.ErrorFormat("CloseClientSocket Disconnect client {0} error, message: {1}", socketInfo, ex.Message);
-        }
-        ReceiveBuffer.Clear();
-        SendBuffer.ClearPacket();
-        // TODO: Dispose
-        Socket.Close();
-        SocketInfo.Disconnect();
-        IsConnect = false;
+
     }
     /// <summary>
     /// 循环接收消息
     /// </summary>
     public void ReceiveAsync()
     {
-        StateObject state = new StateObject();
-        state.workSocket = Socket;
-        Socket.BeginReceive(ReceiveBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);
-        //if (Socket is not null && !Socket.ReceiveAsync(ReceiveAsyncArgs))
-        //{
-        //    lock (Locker)
-        //        ProcessReceive();
-        //}
-    }
-
-    public void ProcessReceive()
-    {
-
-    }
-
-    public void ReceiveMessageHeadCallBack(IAsyncResult ar)
-    {
-        try
+        var receiveArgs = new SocketAsyncEventArgs();
+        receiveArgs.SetBuffer(new byte[ReceiveBuffer.BufferSize], 0, ReceiveBuffer.BufferSize);
+        receiveArgs.Completed += (_, args) => ProcessReceive(args);
+        if (Socket is not null && !Socket.ReceiveAsync(receiveArgs))
         {
-            StateObject state = (StateObject)ar.AsyncState;
-            var socket = state.workSocket;
-            var length = socket.EndReceive(ar);
-            if (length == 0)//接收到0字节表示Socket正常断开
-            {
-                //Logger.Error("AsyncClientFullHandlerSocket.ReceiveMessageHeadCallBack:" + "Socket disconnect");
-                return;
-            }
-            if (length < sizeof(int))//小于四个字节表示包头未完全接收，继续接收
-            {
-                Socket.BeginReceive(ReceiveBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);
-                return;
-            }
-            PacketLength = BitConverter.ToInt32(ReceiveBuffer.Buffer, 0); //获取包长度     
-            if (NetByteOrder)
-                PacketLength = IPAddress.NetworkToHostOrder(PacketLength); //把网络字节顺序转为本地字节顺序
-            ReceiveBuffer.SetBufferSize(sizeof(int) + PacketLength); //保证接收有足够的空间
-            socket.BeginReceive(ReceiveBuffer.Buffer, sizeof(int), PacketLength - sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageDataCallback), state);//每一次异步接收数据都挂接一个新的回调方法，保证一对一
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex.Message);
-            //Logger.Error("AsyncClientFullHandlerSocket.ReceiveMessageHeadCallBack:" + ex.Message);
+            lock (Locker)
+                ProcessReceive(receiveArgs);
         }
     }
 
-    private void ReceiveMessageDataCallback(IAsyncResult ar)
+    public void ProcessReceive(SocketAsyncEventArgs receiveArgs)
     {
-        try
+        if (Socket is null ||
+            receiveArgs.Buffer is null ||
+            receiveArgs.BytesTransferred <= 0 ||
+            receiveArgs.SocketError is not SocketError.Success)
+            goto CLOSE;
+        SocketInfo.Active();
+        ReceiveBuffer.WriteBuffer(receiveArgs.Buffer!, receiveArgs.Offset, receiveArgs.BytesTransferred);
+        // 小于四个字节表示包头未完全接收，继续接收
+        while (ReceiveBuffer.DataCount > sizeof(int))
         {
-            StateObject state = (StateObject)ar.AsyncState;
-            Socket client = state.workSocket;
-            int bytesRead = client.EndReceive(ar);
-            // 接收到0字节表示Socket正常断开
-            if (bytesRead <= 0)
-            {
-                return;
-                //Logger.Error("AsyncClientFullHandlerSocket.ReceiveMessageDataCallback:" + "Socket disconnected");
-            }
-            PacketReceived += bytesRead;
-            // 未接收完整个包数据则继续接收
-            if (PacketReceived + sizeof(int) < PacketLength)
-            {
-                try
-                {
-                    int resDataLength = PacketLength - PacketReceived - sizeof(int);
-                    client.BeginReceive(ReceiveBuffer.Buffer, sizeof(int) + PacketReceived, resDataLength, SocketFlags.None, new AsyncCallback(ReceiveMessageDataCallback), state);
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    //Logger.Error(ex.Message);
-                    //throw ex;//抛出异常并重置异常的抛出点，异常堆栈中前面的异常被丢失
-                    throw;//抛出异常，但不重置异常抛出点，异常堆栈中的异常不会丢失
-                }
-            }
-            PacketReceived = 0;
-            //HACK: int size = 0;
-            int commandLen = BitConverter.ToInt32(ReceiveBuffer.Buffer, sizeof(int)); //取出命令长度
-            string tmpStr = Encoding.UTF8.GetString(ReceiveBuffer.Buffer, sizeof(int) + sizeof(int), commandLen);
-            HandlePacket(ReceiveBuffer.Buffer, sizeof(int), PacketLength);
-            //HACK: if (CommandParser.DecodeProtocolText(tmpStr)) //解析命令，命令（除Message）完成后，必须要使用StaticResetevent这个静态信号量，保证同一时刻只有一个命令在执行
-            try
-            {
-                //判断client.Connected不准确，所以不要使用这个来判断连接是否正常
-                client.BeginReceive(ReceiveBuffer.Buffer, 0, sizeof(int), SocketFlags.None, new AsyncCallback(ReceiveMessageHeadCallBack), state);//继续等待执行接收任务，实现消息循环
-            }
-            catch (Exception ex)
-            {
-                //Logger.Error(ex.Message);
-                //throw ex;//抛出异常并重置异常的抛出点，异常堆栈中前面的异常被丢失
-                throw;//抛出异常，但不重置异常抛出点，异常堆栈中的异常不会丢失
-            }
+            var packetLength = BitConverter.ToInt32(ReceiveBuffer.Buffer, 0);
+            if (UseNetByteOrder)
+                packetLength = IPAddress.NetworkToHostOrder(packetLength);
+            if (packetLength > ConstTabel.ReceiveBufferMax || ReceiveBuffer.DataCount > ConstTabel.ReceiveBufferMax)
+                goto CLOSE;
+            if (ReceiveBuffer.DataCount < packetLength)
+                goto RECEIVE;
+            HandlePacket(ReceiveBuffer.Buffer, sizeof(int), packetLength);
+            ReceiveBuffer.Clear(packetLength);
         }
-        catch (Exception e)
-        {
-#if DEBUG
-            Console.WriteLine(e.ToString());
-#endif
-            //Logger.Error("AsyncClientFullHandlerSocket.ReceiveMessageDataCallback:" + e.Message);
-        }
+    RECEIVE:
+        ReceiveAsync();
+        return;
+    CLOSE:
+        Close();
+        return;
     }
 
     private void HandlePacket(byte[] buffer, int offset, int count)

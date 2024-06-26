@@ -46,8 +46,10 @@ namespace Net
         /// </summary>
         /// <param name="socket">socket</param>
         /// <returns>是否连接</returns>
-        public static bool SocketConnected(System.Net.Sockets.Socket socket)
+        public static bool SocketConnected(System.Net.Sockets.Socket? socket)
         {
+            if (socket is null)
+                return false;
             bool blockingState = socket.Blocking;
             try
             {

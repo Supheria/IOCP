@@ -53,17 +53,15 @@ partial class IocpServerProtocol(IocpServer server)
 
     public bool Close()
     {
-        if (Socket is null)
-            return false;
         try
         {
-            Socket.Shutdown(SocketShutdown.Both);
+            Socket?.Shutdown(SocketShutdown.Both);
         }
         catch (Exception ex)
         {
             //Program.Logger.ErrorFormat("CloseClientSocket Disconnect client {0} error, message: {1}", socketInfo, ex.Message);
         }
-        Socket.Close();
+        Socket?.Close();
         Socket = null;
         ReceiveBuffer.Clear();
         SendBuffer.ClearPacket();
@@ -101,15 +99,17 @@ partial class IocpServerProtocol(IocpServer server)
             goto CLOSE;
         SocketInfo.Active();
         ReceiveBuffer.WriteBuffer(receiveArgs.Buffer!, receiveArgs.Offset, receiveArgs.BytesTransferred);
+        // 小于四个字节表示包头未完全接收，继续接收
         while (ReceiveBuffer.DataCount > sizeof(int))
         {
+
             // 按照长度分包
             // 获取包长度
             var packetLength = BitConverter.ToInt32(ReceiveBuffer.Buffer, 0);
             if (UseNetByteOrder) // 把网络字节顺序转为本地字节顺序
                 packetLength = IPAddress.NetworkToHostOrder(packetLength);
             // 最大Buffer异常保护
-            if ((packetLength > 10 * 1024 * 1024) | (ReceiveBuffer.DataCount > 10 * 1024 * 1024))
+            if (packetLength > ConstTabel.ReceiveBufferMax || ReceiveBuffer.DataCount > ConstTabel.ReceiveBufferMax)
                 goto CLOSE;
             // 收到的数据没有达到包长度，继续接收
             if (ReceiveBuffer.DataCount < packetLength)

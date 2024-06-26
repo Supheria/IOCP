@@ -7,10 +7,6 @@ using System.Text;
 
 namespace Net;
 
-public class StateObject
-{
-    public Socket workSocket = null;
-}
 public static class StaticResetevent
 {
     public static AutoResetEvent Done = new AutoResetEvent(false);
@@ -223,7 +219,11 @@ partial class IocpClientProtocol
                 {
                     Directory.CreateDirectory(dir);
                 }
-                FileStream = new FileStream(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+                try
+                {
+                    FileStream = new FileStream(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+                }
+                catch { }
             }
         }
     }
@@ -281,8 +281,14 @@ partial class IocpClientProtocol
             }
             else//下载文件
             {
-                if (FileStream == null)
-                    FileStream = new FileStream(FilePath, FileMode.Open, FileAccess.ReadWrite);
+                try
+                {
+                    FileStream ??= new FileStream(FilePath, FileMode.Open, FileAccess.ReadWrite);
+                }
+                catch
+                {
+                    return;
+                }
                 FileStream.Position = FileStream.Length; //文件移到末尾                            
                 //HACK: int offset = commandLen + sizeof(int) + sizeof(int);//前8个字节为包长度+命令长度
                 //HACK: size = PacketLength - offset;
@@ -356,7 +362,7 @@ partial class IocpClientProtocol
             {
                 try
                 {
-                    Close();
+                    Socket?.Close();
                     Connect(Host, Port);
                     ReceiveAsync();
                     return Login(UserInfo.Id, UserInfo.Password);
