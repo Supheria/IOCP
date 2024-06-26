@@ -1,62 +1,118 @@
-﻿using System.Text;
+﻿using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Net;
 
-public partial class IocpClientProtocol
+public partial class ClientProtocol
 {
-    protected string Host { get; private set; } = "";
+    public delegate void HandleMessage(string message);
 
-    protected int Port { get; private set; } = 0;
+    public event HandleMessage? OnReceiveMessage;
 
-    /// <summary>
-    /// 长度是否使用网络字节顺序
-    /// </summary>
-    public bool UseNetByteOrder { get; set; } = false;
+    public event HandleEvent? OnConnect;
 
-    /// <summary>
-    /// 协议组装器，用来组装往外发送的命令
-    /// </summary>
-    protected CommandComposer CommandComposer { get; } = new();
+    public event HandleEvent? OnUpload;
 
-    /// <summary>
-    /// 收到数据的解析器，用于解析返回的内容
-    /// </summary>
-    protected CommandParser CommandParser { get; } = new();
+    public event HandleEvent? OnDownload;
 
-    /// <summary>
-    /// 接收数据的缓存
-    /// </summary>
-    protected DynamicBufferManager ReceiveBuffer { get; } = new(ConstTabel.ReceiveBufferSize);
+    object ConnectLocker { get; } = new();
 
-    /// <summary>
-    /// 发送数据的缓存，统一写到内存中，调用一次发送
-    /// </summary>
-    protected AsyncSendBufferManager SendBuffer { get; } = new(ConstTabel.ReceiveBufferSize);
-
-    public void SendCommand()
+    public void Connect(string host, int port)
     {
-        SendCommand([], 0, 0);
+        IPAddress ipAddress;
+        if (Regex.Matches(host, "[a-zA-Z]").Count > 0)//支持域名解析
+        {
+            var ipHostInfo = Dns.GetHostEntry(host);
+            ipAddress = ipHostInfo.AddressList[0];
+        }
+        else
+        {
+            ipAddress = IPAddress.Parse(host);
+        }
+        Connect(new IPEndPoint(ipAddress, port));
     }
 
-    public void SendCommand(byte[] buffer, int offset, int count)
+    private void Connect(EndPoint? remoteEndPoint)
     {
-        string commandText = CommandComposer.GetProtocolText();
-        byte[] bufferUTF8 = Encoding.UTF8.GetBytes(commandText);
-        int totalLength = sizeof(int) + sizeof(int) + bufferUTF8.Length + count; //获取总大小
-        //SendBuffer.Clear();
-        SendBuffer.StartPacket();
-        SendBuffer.DynamicBufferManager.WriteInt(totalLength, false); //写入总大小
-        SendBuffer.DynamicBufferManager.WriteInt(bufferUTF8.Length, false); //写入命令大小
-        SendBuffer.DynamicBufferManager.WriteBuffer(bufferUTF8); //写入命令内容
-        SendBuffer.DynamicBufferManager.WriteBuffer(buffer, offset, count); //写入二进制数据
-        SendBuffer.EndPacket();
-        //SendAsync(Core, SendBuffer.Buffer, 0, SendBuffer.DataCount, SocketFlags.None);
-        if (IsSendingAsync)
+        lock (ConnectLocker)
+        {
+            try
+            {
+                if (Socket is not null)
+                    return;
+                var connectArgs = new SocketAsyncEventArgs()
+                {
+                    RemoteEndPoint = remoteEndPoint
+                };
+                connectArgs.Completed += (_, args) => ProcessConnect(args);
+                Socket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                if (!Socket.ConnectAsync(connectArgs))
+                    ProcessConnect(connectArgs);
+            }
+            catch (Exception ex)
+            {
+                //Console.WriteLine(ex.ToString());
+            }
+        }
+    }
+
+    private void ProcessConnect(SocketAsyncEventArgs connectArgs)
+    {
+        if (connectArgs.ConnectSocket is null)
+        {
+            Socket?.Close();
+            Socket?.Dispose();
             return;
-        if (!SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
-            return;
-        IsSendingAsync = true;
-        SendAsync(SendBuffer.DynamicBufferManager.Buffer, packetOffset, packetCount);
-        return;
+        }
+        new Task(() => OnConnect?.Invoke(this)).Start();
+        SocketInfo.Connect(connectArgs.ConnectSocket);
+    }
+
+    public bool CheckErrorCode()
+    {
+        CommandParser.GetValueAsInt(ProtocolKey.Code, out var errorCode);
+        if (errorCode == ProtocolCode.Success)
+            return true;
+        else
+        {
+            //ErrorString = ProtocolCode.GetErrorCodeString(errorCode);
+            return false;
+        }
+    }
+
+    public bool Active()
+    {
+        try
+        {
+            CommandComposer.Clear();
+            CommandComposer.AddRequest();
+            CommandComposer.AddCommand(ProtocolKey.Active);
+            SendCommand();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            //记录日志
+            //ErrorString = ex.Message;
+            //Logger.Error(ex.Message);
+            return false;
+        }
+    }
+
+    public void HandleReceiveMessage(string message)
+    {
+        new Task(() => OnReceiveMessage?.Invoke(message)).Start();
+    }
+
+    public void HandleDownload()
+    {
+        new Task(() => OnDownload?.Invoke(this)).Start();
+    }
+
+    public void HandleUpload()
+    {
+        new Task(() => OnUpload?.Invoke(this)).Start();
     }
 }

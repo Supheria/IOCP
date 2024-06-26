@@ -2,6 +2,9 @@
 
 namespace Net;
 
+/// <summary>
+/// 收到数据的解析器，用于解析返回的内容
+/// </summary>
 public class CommandParser
 {
     public string Header { get; private set; } = "";

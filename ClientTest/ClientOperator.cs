@@ -21,23 +21,23 @@ public class ClientOperator
 
     public event UpdateMessage? OnUpdateMessage;
 
-    IocpClientProtocol ClientFullHandlerSocket_MSG { get; set; }
+    ClientProtocol ClientFullHandlerSocket_MSG { get; set; }
 
-    IocpClientProtocol ClientFullHandlerSocket_UPLOAD { get; set; }
+    ClientProtocol ClientFullHandlerSocket_UPLOAD { get; set; }
 
-    IocpClientProtocol ClientFullHandlerSoclet_DOWNLOAD { get; set; }
+    ClientProtocol ClientFullHandlerSoclet_DOWNLOAD { get; set; }
 
-    private void OnConncet(IocpClientProtocol protocol)
+    private void OnConncet(IocpProtocol protocol)
     {
         OnUpdateMessage?.Invoke($"{protocol.UserInfo.Name} connect to {protocol.SocketInfo.RemoteEndPoint}");
     }
 
-    void UploadEvent_UploadProcess()
+    void UploadEvent_UploadProcess(IocpProtocol protocol)
     {
         OnUpdateMessage?.Invoke($"{Name}: 文件上传完成");
     }
 
-    void DownLoadEvent_DownLoadProcess()
+    void DownLoadEvent_DownLoadProcess(IocpProtocol protocol)
     {
         OnUpdateMessage?.Invoke($"{Name}: 文件下载完成");
     }

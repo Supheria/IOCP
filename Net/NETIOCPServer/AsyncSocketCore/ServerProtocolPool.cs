@@ -2,15 +2,15 @@
 
 public class ServerProtocolPool(int capacity)
 {
-    Stack<IocpServerProtocol> Pool { get; } = new(capacity);
+    Stack<ServerProtocol> Pool { get; } = new(capacity);
 
-    public void Push(IocpServerProtocol item)
+    public void Push(ServerProtocol item)
     {
         lock (Pool)
             Pool.Push(item);
     }
 
-    public IocpServerProtocol Pop()
+    public ServerProtocol Pop()
     {
         lock (Pool)
             return Pool.Pop();

@@ -1,12 +1,13 @@
-﻿using System.Net.Sockets;
+﻿using System.Net;
+using System.Net.Sockets;
 
 namespace Net;
 
 public class SocketInfo
 {
-    public string? RemoteEndPoint { get; private set; } = null;
+    public EndPoint? RemoteEndPoint { get; private set; } = null;
 
-    public string? LocalEndPoint { get; private set; } = null;
+    public EndPoint? LocalEndPoint { get; private set; } = null;
 
     public DateTime ConnectTime { get; private set; } = DateTime.Now;
 
@@ -16,8 +17,8 @@ public class SocketInfo
 
     public void Connect(Socket socket)
     {
-        RemoteEndPoint = socket.RemoteEndPoint?.ToString();
-        LocalEndPoint = socket.LocalEndPoint?.ToString();
+        RemoteEndPoint = socket.RemoteEndPoint;
+        LocalEndPoint = socket.LocalEndPoint;
         ConnectTime = DateTime.Now;
         ActiveTime = DateTime.Now;
         DisconnectTime = DateTime.Now;

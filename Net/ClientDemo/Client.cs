@@ -6,9 +6,9 @@ namespace ClientDemo
 {
     public partial class Client : Form
     {
-        private IocpClientProtocol ClientFullHandlerSocket_MSG;
-        private IocpClientProtocol ClientFullHandlerSocket_UPLOAD;
-        private IocpClientProtocol ClientFullHandlerSoclet_DOWNLOAD;
+        private ClientProtocol ClientFullHandlerSocket_MSG;
+        private ClientProtocol ClientFullHandlerSocket_UPLOAD;
+        private ClientProtocol ClientFullHandlerSoclet_DOWNLOAD;
         private bool stop = false;
 
         public Hashtable elementHashtable = new Hashtable();
@@ -21,12 +21,12 @@ namespace ClientDemo
 
 
 
-        void uploadEvent_uploadProcess()
+        void uploadEvent_uploadProcess(IocpProtocol protocol)
         {
             MessageBox.Show("上传完成！");
         }
 
-        void downLoadEvent_downLoadProcess()
+        void downLoadEvent_downLoadProcess(IocpProtocol protocol)
         {
             MessageBox.Show("下载完成！");
         }

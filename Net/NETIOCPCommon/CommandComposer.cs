@@ -11,7 +11,7 @@ public class CommandComposer
         ProtocolText.Clear();
     }
 
-    public string GetProtocolText()
+    public string GetCommand()
     {
         var str = new StringBuilder();
         if (ProtocolText.Count > 0)

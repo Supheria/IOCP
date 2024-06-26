@@ -52,7 +52,7 @@ internal class ServerForm : ResizeableForm
         Shown += (_, _) => Server.Start((int)Port.Value);
     }
 
-    private void Server_OnTip(string tip, IocpServerProtocol protocol)
+    private void Server_OnTip(string tip, ServerProtocol protocol)
     {
         UpdateMessage($"tip: {protocol.SocketInfo.RemoteEndPoint} {tip}");
     }
@@ -69,7 +69,7 @@ internal class ServerForm : ResizeableForm
         }
     }
 
-    private void Server_OnReceiveMessage(string message, IocpServerProtocol protocol)
+    private void Server_OnReceiveMessage(string message, ServerProtocol protocol)
     {
         if (message.Contains(";"))
         {
@@ -90,7 +90,7 @@ internal class ServerForm : ResizeableForm
         }
     }
 
-    private void Server_OnClientNumberChange(IocpServer.ClientState state, IocpServerProtocol protocol)
+    private void Server_OnClientNumberChange(IocpServer.ClientState state, ServerProtocol protocol)
     {
         if (state is IocpServer.ClientState.Connect)
         {

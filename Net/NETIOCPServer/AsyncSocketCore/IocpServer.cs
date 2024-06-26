@@ -33,9 +33,9 @@ public class IocpServer
         Disconnect,
     }
 
-    public delegate void HandleMessage(string message, IocpServerProtocol protocol);
+    public delegate void HandleMessage(string message, ServerProtocol protocol);
 
-    public delegate void ClientNumberChange(ClientState state, IocpServerProtocol protocol);
+    public delegate void ClientNumberChange(ClientState state, ServerProtocol protocol);
 
     public delegate void ParallelRemainChange(int remain);
 
@@ -52,8 +52,8 @@ public class IocpServer
         DaemonThread = new(ProcessDaemon);
         for (int i = 0; i < ParallelCountMax; i++) //按照连接数建立读写对象
         {
-            var protocol = new IocpServerProtocol(this);
-            protocol.OnClosed += () =>
+            var protocol = new ServerProtocol(this);
+            protocol.OnClosed += (_) =>
             {
                 ProtocolPool.Push(protocol);
                 ProtocolList.Remove(protocol);
@@ -174,7 +174,7 @@ public class IocpServer
             StartAccept(acceptArgs); //把当前异步事件释放，等待下次连接
     }
 
-    public void HandleReceiveMessage(string message, IocpServerProtocol protocol)
+    public void HandleReceiveMessage(string message, ServerProtocol protocol)
     {
         new Task(() => OnReceiveMessage?.Invoke(message, protocol)).Start();
     }
@@ -219,11 +219,11 @@ public class IocpServer
     }
 
     // TODO: make this reuseable
-    public delegate void HandleTip(string tip, IocpServerProtocol protocol);
+    public delegate void HandleTip(string tip, ServerProtocol protocol);
 
     public event HandleTip? OnTip;
 
-    public void Tip(string tip, IocpServerProtocol protocol)
+    public void Tip(string tip, ServerProtocol protocol)
     {
         new Task(() => OnTip?.Invoke(tip, protocol)).Start();
     }

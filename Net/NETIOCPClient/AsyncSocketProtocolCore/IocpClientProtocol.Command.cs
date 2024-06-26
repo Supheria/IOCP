@@ -2,17 +2,9 @@
 
 namespace Net;
 
-partial class IocpClientProtocol : IDisposable
+partial class ClientProtocol : IocpProtocol
 {
-    bool IsLogin { get; set; } = false;
-
     public int PacketSize { get; set; } = 8 * 1024;
-
-    public string FilePath { get; private set; } = "";
-
-    byte[]? ReadBuffer { get; set; } = null;
-
-    FileStream? FileStream { get; set; } = null;
 
     /// <summary>
     /// 文件的剩余长度
@@ -31,17 +23,7 @@ partial class IocpClientProtocol : IDisposable
 
     bool IsSendingFile { get; set; } = false;
 
-    public UserInfo UserInfo { get; } = new();
-
     public AutoResetEvent LoginDone { get; } = new(false);
-
-    public void Dispose()
-    {
-        FilePath = "";
-        FileStream?.Close();
-        FileStream = null;
-        GC.SuppressFinalize(this);
-    }
 
     /// <summary>
     /// 向服务端发送消息，由消息来驱动业务逻辑，接收方必须返回应答，否则认为发送失败
@@ -70,7 +52,7 @@ partial class IocpClientProtocol : IDisposable
         }
     }
 
-    private void ProcessCommand(byte[] buffer, int offset, int count)
+    protected override void ProcessCommand(byte[] buffer, int offset, int count)
     {
         ////CommandComposer.Clear();
         ////CommandComposer.AddResponse();
@@ -277,7 +259,7 @@ partial class IocpClientProtocol : IDisposable
         try
         {
             Socket?.Close();
-            Connect(Host, Port);
+            Connect(SocketInfo.RemoteEndPoint);
             ReceiveAsync();
             return Login(UserInfo.Id, UserInfo.Password);
         }

@@ -90,12 +90,12 @@ public class ClientTestBoostForm : ResizeableForm
         c1.Disconnet();
         c3 = new("c3");
         c3.OnUpdateMessage += UpdateMessage;
-        c3.Connect(ipAddress, port);
+        //c3.Connect(ipAddress, port);
         //
         Thread.Sleep(10);
         //
         c2.Connect(ipAddress, port);
-        c1.Connect(ipAddress, port);
+        //c1.Connect(ipAddress, port);
         c1.SendMessage("c1;Hello World;");
         c1.UploadFile(UploadFilePath);
         //

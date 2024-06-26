@@ -1,99 +1,85 @@
-﻿using System.Text;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 
 namespace Net;
 
-/// <summary>
-/// 异步Socket调用对象，所有的协议处理都从本类继承
-/// </summary>
-/// <param name="type"></param>
-/// <param name="server"></param>
-/// <param name="userToken"></param>
-public partial class IocpServerProtocol
+public partial class ServerProtocol(IocpServer server)
 {
-    /// <summary>
-    /// 长度是否使用网络字节顺序
-    /// </summary>
-    public bool UseNetByteOrder { get; set; } = false;
+    IocpServer Server { get; } = server;
 
-    /// <summary>
-    /// 协议解析器，用来解析客户端接收到的命令
-    /// </summary>
-    protected CommandParser CommandParser { get; } = new();
+    object AcceptLocker { get; } = new();
 
-    /// <summary>
-    /// 协议组装器，用来组织服务端返回的命令
-    /// </summary>
-    protected CommandComposer CommandComposer { get; } = new();
-
-    /// <summary>
-    /// 标识是否有发送异步事件
-    /// </summary>
-    bool IsSendingAsync { get; set; } = false;
-
-    protected void CommandFail(int errorCode, string message)
+    public bool ProcessAccept(Socket? acceptSocket)
     {
-        CommandComposer.AddFailure(errorCode, message);
-        SendCommand();
+        lock (AcceptLocker)
+        {
+            if (acceptSocket is null || Socket is not null)
+                return false;
+            Socket = acceptSocket;
+            // 设置TCP Keep-alive数据包的发送间隔为10秒
+            Socket.IOControl(IOControlCode.KeepAliveValues, KeepAlive(1, 1000 * 10, 1000 * 10), null);
+            SocketInfo.Connect(acceptSocket);
+            return true;
+        }
     }
 
-    protected void CommandSucceed(params (string Key, object value)[] addValues)
+    /// <summary>
+    /// keep alive 设置
+    /// </summary>
+    /// <param name="onOff">是否开启（1为开，0为关）</param>
+    /// <param name="keepAliveTime">当开启keep-alive后，经过多长时间（ms）开启侦测</param>
+    /// <param name="keepAliveInterval">多长时间侦测一次（ms）</param>
+    /// <returns>keep alive 输入参数</returns>
+    private static byte[] KeepAlive(int onOff, int keepAliveTime, int keepAliveInterval)
     {
-        CommandSucceed([], 0, 0, addValues);
+        byte[] buffer = new byte[12];
+        BitConverter.GetBytes(onOff).CopyTo(buffer, 0);
+        BitConverter.GetBytes(keepAliveTime).CopyTo(buffer, 4);
+        BitConverter.GetBytes(keepAliveInterval).CopyTo(buffer, 8);
+        return buffer;
     }
 
-    protected void CommandSucceed(byte[] buffer, int offset, int count, params (string Key, object value)[] addValues)
+    /// <summary>
+    /// 发送回调函数，用于连续下发数据
+    /// </summary>
+    /// <returns></returns>
+    protected override void SendCallback()
     {
-        CommandComposer.AddSuccess();
-        foreach (var (key, value) in addValues)
-            CommandComposer.AddValue(key, value.ToString() ?? "");
-        SendCommand(buffer, offset, count);
-    }
-
-    protected void SendCommand()
-    {
-        SendCommand([], 0, 0);
-    }
-
-    protected void SendCommand(byte[] buffer, int offset, int count)
-    {
-        // 获取命令
-        var commandText = CommandComposer.GetProtocolText();
-        // 获取命令的字节数组
-        var bufferUTF8 = Encoding.UTF8.GetBytes(commandText);
-        // 获取总大小(4个字节的包总长度+4个字节的命令长度+命令字节数组的长度+数据的字节数组长度)
-        int totalLength = sizeof(int) + sizeof(int) + bufferUTF8.Length + count;
-        SendBuffer.StartPacket();
-        SendBuffer.DynamicBufferManager.WriteInt(totalLength, false); // 写入总大小
-        SendBuffer.DynamicBufferManager.WriteInt(bufferUTF8.Length, false); // 写入命令大小
-        SendBuffer.DynamicBufferManager.WriteBuffer(bufferUTF8); // 写入命令内容
-        SendBuffer.DynamicBufferManager.WriteBuffer(buffer, offset, count); // 写入二进制数据
-        SendBuffer.EndPacket();
-        if (IsSendingAsync)
+        if (FileStream is null)
             return;
-        if (!SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
+        if (IsSendingFile) // 发送文件头
+        {
+            CommandComposer.Clear();
+            CommandComposer.AddResponse();
+            CommandComposer.AddCommand(ProtocolKey.SendFile);
+            CommandSucceed((ProtocolKey.FileSize, FileStream.Length - FileStream.Position));
+            IsSendingFile = false;
             return;
-        IsSendingAsync = true;
-        SendAsync(SendBuffer.DynamicBufferManager.Buffer, packetOffset, packetCount);
-        return;
+        }
+        if (IsReceivingFile)
+            return;
+        // 没有接收文件时
+        // 发送具体数据,加FileStream.CanSeek是防止上传文件结束后，文件流被释放而出错
+        if (FileStream.CanSeek && FileStream.Position < FileStream.Length)
+        {
+            CommandComposer.Clear();
+            CommandComposer.AddResponse();
+            CommandComposer.AddCommand(ProtocolKey.Data);
+            ReadBuffer ??= new byte[PacketSize];
+            // 避免多次申请内存
+            if (ReadBuffer.Length < PacketSize)
+                ReadBuffer = new byte[PacketSize];
+            var count = FileStream.Read(ReadBuffer, 0, PacketSize);
+            CommandSucceed(ReadBuffer, 0, count);
+            return;
+        }
+        // 发送完成
+        //ServerInstance.Logger.Info("End Upload file: " + FilePath);
+        FileStream.Close();
+        FileStream = null;
+        FilePath = "";
+        IsSendingFile = false;
     }
-
-    /// <summary>
-    /// 不是按包格式下发一个内存块，用于日志这类下发协议
-    /// </summary>
-    /// <param name="buffer"></param>
-    /// <param name="offset"></param>
-    /// <param name="count"></param>
-    // HACK: protected void SendBuffer(byte[] buffer, int offset, int count)
-    //{
-    //    UserToken.SendBuffer.StartPacket();
-    //    UserToken.SendBuffer.DynamicBufferManager.WriteBuffer(buffer, offset, count);
-    //    UserToken.SendBuffer.EndPacket();
-    //    if (IsSendingAsync)
-    //        return;
-    //    if (!UserToken.SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
-    //        return;
-    //    IsSendingAsync = true;
-    //    UserToken.SendAsync(packetOffset, packetCount);
-    //    return;
-    //}
 }

@@ -7,17 +7,9 @@ namespace Net;
 /// </summary>
 /// <param name="server"></param>
 /// <param name="userToken"></param>
-partial class IocpServerProtocol : IDisposable
+partial class ServerProtocol : IocpProtocol
 {
-    bool IsLogin { get; set; } = false;
-
     int PacketSize { get; set; } = 64 * 1024;
-
-    public string FilePath { get; private set; } = "";
-
-    byte[]? ReadBuffer { get; set; } = null;
-
-    FileStream? FileStream { get; set; } = null;
 
     bool IsSendingFile { get; set; } = false;
 
@@ -27,20 +19,10 @@ partial class IocpServerProtocol : IDisposable
 
     long ReceivedFileSize { get; set; } = 0;
 
-    UserInfo UserInfo { get; } = new();
-
     // TODO: make the dir more common-useable
     public DirectoryInfo RootDirectory { get; set; } = Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "upload"));
 
     string RootDirectoryPath => RootDirectory.FullName;
-
-    public void Dispose()
-    {
-        FilePath = "";
-        FileStream?.Close();
-        FileStream = null;
-        GC.SuppressFinalize(this);
-    }
 
     /// <summary>
     /// 发送消息到客户端，由消息来驱动业务逻辑，接收方必须返回应答，否则认为发送不成功
@@ -63,7 +45,7 @@ partial class IocpServerProtocol : IDisposable
     /// <param name="offset"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    private void ProcessCommand(byte[] buffer, int offset, int count)
+    protected override void ProcessCommand(byte[] buffer, int offset, int count)
     {
         CommandComposer.Clear();
         CommandComposer.AddResponse();
@@ -99,6 +81,24 @@ partial class IocpServerProtocol : IDisposable
             default:
                 return;
         }
+    }
+    protected void CommandFail(int errorCode, string message)
+    {
+        CommandComposer.AddFailure(errorCode, message);
+        SendCommand();
+    }
+
+    protected void CommandSucceed(params (string Key, object value)[] addValues)
+    {
+        CommandSucceed([], 0, 0, addValues);
+    }
+
+    protected void CommandSucceed(byte[] buffer, int offset, int count, params (string Key, object value)[] addValues)
+    {
+        CommandComposer.AddSuccess();
+        foreach (var (key, value) in addValues)
+            CommandComposer.AddValue(key, value.ToString() ?? "");
+        SendCommand(buffer, offset, count);
     }
 
     private bool CheckLogin()
