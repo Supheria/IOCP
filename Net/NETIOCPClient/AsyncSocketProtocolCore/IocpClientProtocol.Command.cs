@@ -31,13 +31,12 @@ partial class ClientProtocol : IocpProtocol
     /// <param name="msg">消息内容</param>
     public void SendMessage(string message)
     {
-        CommandComposer.Clear();
-        CommandComposer.AddRequest();
-        CommandComposer.AddCommand(ProtocolKey.Message);
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.Message);
         var buffer = Encoding.UTF8.GetBytes(message);
         try
         {
-            SendCommand(buffer, 0, buffer.Length);
+            SendCommand(commandComposer, buffer, 0, buffer.Length);
         }
         catch (Exception ex)
         {
@@ -47,8 +46,7 @@ partial class ClientProtocol : IocpProtocol
                 //Logger.Error("AsyncClientFullHandlerSocket.SendMessage:" + "Socket disconnect");
                 throw new ClientProtocolException("Server is Stoped"); //抛异常是为了让前台知道网络链路的情况         
             }
-            // TODO: here maybe dead loop
-            SendMessage(message);
+            new Task(() => SendMessage(message)).Start();
         }
     }
 
@@ -157,12 +155,11 @@ partial class ClientProtocol : IocpProtocol
             return;
         // 上传文件中
         // 发送具体数据
-        CommandComposer.Clear();
-        CommandComposer.AddRequest();
-        CommandComposer.AddCommand(ProtocolKey.Data);
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.Data);
         ReadBuffer ??= new byte[PacketSize];
         var count = FileStream.Read(ReadBuffer, 0, PacketSize);
-        SendCommand(ReadBuffer, 0, count);
+        SendCommand(commandComposer, ReadBuffer, 0, count);
     }
 
     private void DoData(byte[] buffer, int offset, int count)
@@ -201,38 +198,35 @@ partial class ClientProtocol : IocpProtocol
             return;
         }
         // 发送具体数据
-        CommandComposer.Clear();
-        CommandComposer.AddRequest();
-        CommandComposer.AddCommand(ProtocolKey.Data);
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.Data);
         ReadBuffer ??= new byte[PacketSize];
         // 读取剩余文件数据
         var countRemain = FileStream.Read(ReadBuffer, 0, PacketSize);
-        SendCommand(ReadBuffer, 0, countRemain);
+        SendCommand(commandComposer, ReadBuffer, 0, countRemain);
     }
 
     private void DoUpload()
     {
         if (FileStream is null || !IsSendingFile)
             return;
-        CommandComposer.Clear();
-        CommandComposer.AddRequest();
-        CommandComposer.AddCommand(ProtocolKey.SendFile);
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.SendFile);
         //CommandComposer.AddValue(ProtocolKey.FileSize, FileStream.Length);
-        SendCommand();
+        SendCommand(commandComposer);
     }
 
     public bool Login(string userID, string password)
     {
         try
         {
-            CommandComposer.Clear();
-            CommandComposer.AddRequest();
-            CommandComposer.AddCommand(ProtocolKey.Login);
-            CommandComposer.AddValue(ProtocolKey.UserID, userID);
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.Login)
+                .AppendValue(ProtocolKey.UserID, userID)
+                .AppendValue(ProtocolKey.Password, password);
             //CommandComposer.AddValue(ProtocolKey.Password, IocpServer.BasicFunc.MD5String(password));
-            CommandComposer.AddValue(ProtocolKey.Password, password);
             UserInfo.Password = password;
-            SendCommand();
+            SendCommand(commandComposer);
             LoginDone.WaitOne();//登录阻塞，强制同步
             return IsLogin;
         }
@@ -288,14 +282,13 @@ partial class ClientProtocol : IocpProtocol
                 //Logger.Error("Start Upload file error, file is not exists: " + fileFullPath);
                 return;
             }
-            CommandComposer.Clear();
-            CommandComposer.AddRequest();
-            CommandComposer.AddCommand(ProtocolKey.Upload);
-            CommandComposer.AddValue(ProtocolKey.DirName, remoteDir);
-            CommandComposer.AddValue(ProtocolKey.FileName, remoteName);
-            CommandComposer.AddValue(ProtocolKey.FileSize, fileSize);
-            CommandComposer.AddValue(ProtocolKey.PacketSize, PacketSize);
-            SendCommand();
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.Upload)
+                .AppendValue(ProtocolKey.DirName, remoteDir)
+                .AppendValue(ProtocolKey.FileName, remoteName)
+                .AppendValue(ProtocolKey.FileSize, fileSize)
+                .AppendValue(ProtocolKey.PacketSize, PacketSize);
+            SendCommand(commandComposer);
         }
         catch (Exception e)
         {
@@ -328,14 +321,13 @@ partial class ClientProtocol : IocpProtocol
                 }
                 fileSize = FileStream.Length;
             }
-            CommandComposer.Clear();
-            CommandComposer.AddRequest();
-            CommandComposer.AddCommand(ProtocolKey.Download);
-            CommandComposer.AddValue(ProtocolKey.DirName, dirName);
-            CommandComposer.AddValue(ProtocolKey.FileName, fileName);
-            CommandComposer.AddValue(ProtocolKey.FileSize, fileSize);
-            CommandComposer.AddValue(ProtocolKey.PacketSize, PacketSize);
-            SendCommand();
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.Download)
+                .AppendValue(ProtocolKey.DirName, dirName)
+                .AppendValue(ProtocolKey.FileName, fileName)
+                .AppendValue(ProtocolKey.FileSize, fileSize)
+                .AppendValue(ProtocolKey.PacketSize, PacketSize);
+            SendCommand(commandComposer);
         }
         catch (Exception E)
         {

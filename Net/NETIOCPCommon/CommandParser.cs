@@ -10,7 +10,7 @@ namespace Net;
 
 public class CommandParser
 {
-    Dictionary<string, string> Map { get; } = [];
+    Dictionary<string, string> Commands { get; } = [];
 
     public static CommandParser Parse(string command)
     {
@@ -18,46 +18,46 @@ public class CommandParser
         var lines = command.Split([ProtocolKey.ReturnWrap], StringSplitOptions.RemoveEmptyEntries);
         foreach (var line in lines)
         {
-            var pair = line.Split([ProtocolKey.EqualSign], StringSplitOptions.None);
+            var pair = line.Split(ProtocolKey.EqualSign, StringSplitOptions.None);
             if (pair.Length < 2)
                 continue;
-            result.Map[pair[0]] = pair[1];
+            result.Commands[pair[0]] = pair[1];
         }
         return result;
     }
 
     public bool GetValueAsString(string key, [NotNullWhen(true)] out string? value)
     {
-        return Map.TryGetValue(key, out value);
+        return Commands.TryGetValue(key, out value);
     }
 
     public bool GetValueAsShort(string key, out short value)
     {
-        Map.TryGetValue(key, out var str);
+        Commands.TryGetValue(key, out var str);
         return short.TryParse(str, out value);
     }
 
     public bool GetValueAsInt(string key, out int value)
     {
-        Map.TryGetValue(key, out var str);
+        Commands.TryGetValue(key, out var str);
         return int.TryParse(str, out value);
     }
 
     public bool GetValueAsLong(string key, out long value)
     {
-        Map.TryGetValue(key, out var str);
+        Commands.TryGetValue(key, out var str);
         return long.TryParse(str, out value);
     }
 
     public bool GetValueAsFloat(string key, out float value)
     {
-        Map.TryGetValue(key, out var str);
+        Commands.TryGetValue(key, out var str);
         return float.TryParse(str, out value);
     }
 
     public bool GetValueAsDouble(string key, out double value)
     {
-        Map.TryGetValue(key, out var str);
+        Commands.TryGetValue(key, out var str);
         return double.TryParse(str, out value);
     }
 }

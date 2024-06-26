@@ -4,84 +4,68 @@ namespace Net;
 
 public class CommandComposer
 {
-    List<string> ProtocolText { get; } = [];
+    List<string> Commands { get; } = [];
 
     public void Clear()
     {
-        ProtocolText.Clear();
+        Commands.Clear();
     }
 
     public string GetCommand()
     {
         var str = new StringBuilder();
-        if (ProtocolText.Count > 0)
-            str.AppendJoin(ProtocolKey.ReturnWrap, ProtocolText);
+        if (Commands.Count > 0)
+            str.AppendJoin(ProtocolKey.ReturnWrap, Commands);
         return str.ToString();
     }
 
-    public void AddRequest()
-    {
-        //var str = new StringBuilder()
-        //    .Append(ProtocolKey.LeftBrackets)
-        //    //.Append(ProtocolKey.Request)
-        //    .Append(ProtocolKey.RightBrackets)
-        //    .ToString();
-        //ProtocolText.Add(str);
-    }
-
-    public void AddResponse()
-    {
-        //var str = new StringBuilder()
-        //    .Append(ProtocolKey.LeftBrackets)
-        //    //.Append(ProtocolKey.Response)
-        //    .Append(ProtocolKey.RightBrackets)
-        //    .ToString();
-        //ProtocolText.Add(str);
-    }
-
-    public void AddCommand(string commandKey)
+    public CommandComposer AppendCommand(string commandKey)
     {
         var str = new StringBuilder()
             .Append(ProtocolKey.Command)
             .Append(ProtocolKey.EqualSign)
             .Append(commandKey)
             .ToString();
-        ProtocolText.Add(str);
+        Commands.Add(str);
+        return this;
     }
 
-    public void AddSuccess()
+    public CommandComposer AppendSuccess()
     {
         var str = new StringBuilder()
             .Append(ProtocolKey.Code)
             .Append(ProtocolKey.EqualSign)
             .Append(ProtocolCode.Success)
             .ToString();
-        ProtocolText.Add(str);
+        Commands.Add(str);
+        return this;
     }
 
-    public void AddFailure(int errorCode, string message)
+    public CommandComposer AppendFailure(int errorCode, string message)
     {
         var str = new StringBuilder()
             .Append(ProtocolKey.Code)
             .Append(ProtocolKey.EqualSign)
             .Append(errorCode)
             .ToString();
-        ProtocolText.Add(str);
+        Commands.Add(str);
         str = new StringBuilder()
             .Append(ProtocolKey.Message)
             .Append(ProtocolKey.EqualSign)
             .Append(message)
             .ToString();
-        ProtocolText.Add(str);
+        Commands.Add(str);
+        return this;
     }
 
-    public void AddValue(string protocolKey, object value)
+    public CommandComposer AppendValue(string key, object value)
     {
         var str = new StringBuilder()
-            .Append(protocolKey)
+            .Append(key)
             .Append(ProtocolKey.EqualSign)
             .Append(value.ToString())
             .ToString();
-        ProtocolText.Add(str);
+        Commands.Add(str);
+        return this;
     }
 }

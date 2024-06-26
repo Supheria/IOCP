@@ -21,7 +21,7 @@ public abstract class IocpProtocol : IDisposable
 
     protected AsyncSendBufferManager SendBuffer { get; } = new(ConstTabel.InitBufferSize);
 
-    protected CommandComposer CommandComposer { get; } = new();
+    //protected CommandComposer CommandComposer { get; } = new();
 
     //protected CommandParser CommandParser { get; } = new();
 
@@ -163,23 +163,23 @@ public abstract class IocpProtocol : IDisposable
 
     }
 
-    public void SendCommand()
+    public void SendCommand(CommandComposer commandComposer)
     {
-        SendCommand([], 0, 0);
+        SendCommand(commandComposer, [], 0, 0);
     }
 
-    protected void SendCommand(byte[] buffer, int offset, int count)
+    protected void SendCommand(CommandComposer commandComposer, byte[] buffer, int offset, int count)
     {
         // 获取命令
-        var commandText = CommandComposer.GetCommand();
+        var command = commandComposer.GetCommand();
         // 获取命令的字节数组
-        var bufferUTF8 = Encoding.UTF8.GetBytes(commandText);
+        var commandBuffer = Encoding.UTF8.GetBytes(command);
         // 获取总大小(4个字节的包总长度+4个字节的命令长度+命令字节数组的长度+数据的字节数组长度)
-        int totalLength = sizeof(int) + sizeof(int) + bufferUTF8.Length + count;
+        int totalLength = sizeof(int) + sizeof(int) + commandBuffer.Length + count;
         SendBuffer.StartPacket();
         SendBuffer.DynamicBufferManager.WriteInt(totalLength, false); // 写入总大小
-        SendBuffer.DynamicBufferManager.WriteInt(bufferUTF8.Length, false); // 写入命令大小
-        SendBuffer.DynamicBufferManager.WriteBuffer(bufferUTF8); // 写入命令内容
+        SendBuffer.DynamicBufferManager.WriteInt(commandBuffer.Length, false); // 写入命令大小
+        SendBuffer.DynamicBufferManager.WriteBuffer(commandBuffer); // 写入命令内容
         SendBuffer.DynamicBufferManager.WriteBuffer(buffer, offset, count); // 写入二进制数据
         SendBuffer.EndPacket();
         if (IsSendingAsync)

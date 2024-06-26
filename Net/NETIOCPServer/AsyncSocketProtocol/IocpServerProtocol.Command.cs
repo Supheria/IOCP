@@ -30,16 +30,15 @@ partial class ServerProtocol : IocpProtocol
     /// <param name="message">消息</param>
     public void SendMessage(string message)
     {
-        CommandComposer.Clear();
-        CommandComposer.AddResponse();
-        CommandComposer.AddCommand(ProtocolKey.Message);
-        CommandComposer.AddSuccess();
+        var commandComposer = new CommandComposer();
+        commandComposer.AppendCommand(ProtocolKey.Message);
+        commandComposer.AppendSuccess();
         var buffer = Encoding.UTF8.GetBytes(message);
-        SendCommand(buffer, 0, buffer.Length);
+        SendCommand(commandComposer, buffer, 0, buffer.Length);
     }
 
     /// <summary>
-    /// 处理分完包的数据，子类从这个方法继承,服务端在此处处理所有的客户端命令请求，返回结果必须加入CommandComposer.AddResponse();
+    /// 处理分完包的数据，子类从这个方法继承,服务端在此处处理所有的客户端命令请求
     /// </summary>
     /// <param name="buffer"></param>
     /// <param name="offset"></param>
@@ -49,9 +48,6 @@ partial class ServerProtocol : IocpProtocol
     {
         if (!commandParser.GetValueAsString(ProtocolKey.Command, out var command))
             return;
-        CommandComposer.Clear();
-        CommandComposer.AddResponse();
-        CommandComposer.AddCommand(command);
         if (!CheckLogin(command)) //检测登录
         {
             CommandFail(ProtocolCode.UserHasLogined, "");
@@ -86,21 +82,20 @@ partial class ServerProtocol : IocpProtocol
     }
     protected void CommandFail(int errorCode, string message)
     {
-        CommandComposer.AddFailure(errorCode, message);
-        SendCommand();
+        var commandComposer = new CommandComposer()
+            .AppendFailure(errorCode, message);
+        SendCommand(commandComposer);
     }
 
-    protected void CommandSucceed(params (string Key, object value)[] addValues)
+    protected void CommandSucceed(CommandComposer commandComposer)
     {
-        CommandSucceed([], 0, 0, addValues);
+        CommandSucceed(commandComposer, [], 0, 0);
     }
 
-    protected void CommandSucceed(byte[] buffer, int offset, int count, params (string Key, object value)[] addValues)
+    protected void CommandSucceed(CommandComposer commandComposer, byte[] buffer, int offset, int count)
     {
-        CommandComposer.AddSuccess();
-        foreach (var (key, value) in addValues)
-            CommandComposer.AddValue(key, value.ToString() ?? "");
-        SendCommand(buffer, offset, count);
+        commandComposer.AppendSuccess();
+        SendCommand(commandComposer, buffer, offset, count);
     }
 
     private bool CheckLogin(string command)
@@ -113,12 +108,16 @@ partial class ServerProtocol : IocpProtocol
 
     private void DoActive()
     {
-        CommandSucceed();
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.Active);
+        CommandSucceed(commandComposer);
     }
 
     private void DoSendFile()
     {
-        CommandSucceed([]);
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.SendFile);
+        CommandSucceed(commandComposer);
     }
 
     public void DoData(byte[] buffer, int offset, int count)
@@ -140,10 +139,9 @@ partial class ServerProtocol : IocpProtocol
             Server.Tip($"文件接收成功，完成时间{DateTime.Now}", this);
 #endif
         }
-        CommandComposer.Clear();
-        CommandComposer.AddResponse();
-        CommandComposer.AddCommand(ProtocolKey.Data);
-        CommandSucceed();
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.Data);
+        CommandSucceed(commandComposer);
     }
 
     /// <summary>
@@ -184,7 +182,9 @@ partial class ServerProtocol : IocpProtocol
         FileStream = new FileStream(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
         IsReceivingFile = true;
         ReceivedFileSize = fileSize;
-        CommandSucceed();
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.Upload);
+        CommandSucceed(commandComposer);
     }
 
     /// <summary>
@@ -232,7 +232,9 @@ partial class ServerProtocol : IocpProtocol
         IsSendingFile = true;
         PacketSize = packetSize;
         //ServerInstance.Logger.Info("Start download file: " + filePath);
-        CommandSucceed();
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.Download);
+        CommandSucceed(commandComposer);
     }
 
     private void DoMessage(byte[] buffer, int offset, int count)
@@ -243,7 +245,9 @@ partial class ServerProtocol : IocpProtocol
 #if DEBUG
         SendMessage("result: received");
 #endif
-        CommandSucceed();
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.Message);
+        CommandSucceed(commandComposer);
     }
 
     // TODO: modify this for common-use
@@ -267,10 +271,11 @@ partial class ServerProtocol : IocpProtocol
         UserInfo.Password = password;
         IsLogin = true;
         //ServerInstance.Logger.InfoFormat("{0} login success", userID);
-        CommandSucceed(
-            (ProtocolKey.UserID, UserInfo.Id),
-            (ProtocolKey.UserName, UserInfo.Name)
-            );
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.Login)
+            .AppendValue(ProtocolKey.UserID, UserInfo.Id)
+            .AppendValue(ProtocolKey.UserName, UserInfo.Name);
+        CommandSucceed(commandComposer);
     }
 
     private void DoDir(CommandParser commandParser)
@@ -288,14 +293,15 @@ partial class ServerProtocol : IocpProtocol
         char[] directorySeparator = [Path.DirectorySeparatorChar];
         try
         {
-            var values = new List<(string, object)>();
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.Dir);
             foreach (var subDir in Directory.GetDirectories(dir, "*", SearchOption.TopDirectoryOnly))
             {
                 var dirName = subDir.Split(directorySeparator, StringSplitOptions.RemoveEmptyEntries);
-                values.Add((ProtocolKey.Item, dirName[dirName.Length - 1]));
+                commandComposer.AppendValue(ProtocolKey.Item, dirName[dirName.Length - 1]);
 
             }
-            CommandSucceed(values.ToArray());
+            CommandSucceed(commandComposer);
         }
         catch (Exception ex)
         {
@@ -318,13 +324,14 @@ partial class ServerProtocol : IocpProtocol
         }
         try
         {
-            var values = new List<(string, object)>();
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.FileList);
             foreach (var file in Directory.GetFiles(dir))
             {
                 var fileInfo = new FileInfo(file);
-                values.Add((ProtocolKey.Item, fileInfo.Name + ProtocolKey.TextSeperator + fileInfo.Length.ToString()));
+                commandComposer.AppendValue(ProtocolKey.Item, fileInfo.Name + ProtocolKey.TextSeperator + fileInfo.Length.ToString());
             }
-            CommandSucceed(values.ToArray());
+            CommandSucceed(commandComposer);
         }
         catch (Exception ex)
         {

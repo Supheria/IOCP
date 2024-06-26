@@ -73,7 +73,7 @@ public partial class ClientProtocol
     public bool CheckErrorCode(CommandParser commandParser)
     {
         commandParser.GetValueAsInt(ProtocolKey.Code, out var errorCode);
-        if (errorCode == ProtocolCode.Success)
+        if (errorCode is ProtocolCode.Success)
             return true;
         else
         {
@@ -86,10 +86,9 @@ public partial class ClientProtocol
     {
         try
         {
-            CommandComposer.Clear();
-            CommandComposer.AddRequest();
-            CommandComposer.AddCommand(ProtocolKey.Active);
-            SendCommand();
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.Active);
+            SendCommand(commandComposer);
             return true;
         }
         catch (Exception ex)

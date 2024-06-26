@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -51,10 +52,11 @@ public partial class ServerProtocol(IocpServer server)
             return;
         if (IsSendingFile) // 发送文件头
         {
-            CommandComposer.Clear();
-            CommandComposer.AddResponse();
-            CommandComposer.AddCommand(ProtocolKey.SendFile);
-            CommandSucceed((ProtocolKey.FileSize, FileStream.Length - FileStream.Position));
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.SendFile)
+                .AppendValue(ProtocolKey.FileSize, FileStream.Length - FileStream.Position)
+                .AppendSuccess();
+            SendCommand(commandComposer);
             IsSendingFile = false;
             return;
         }
@@ -64,15 +66,15 @@ public partial class ServerProtocol(IocpServer server)
         // 发送具体数据,加FileStream.CanSeek是防止上传文件结束后，文件流被释放而出错
         if (FileStream.CanSeek && FileStream.Position < FileStream.Length)
         {
-            CommandComposer.Clear();
-            CommandComposer.AddResponse();
-            CommandComposer.AddCommand(ProtocolKey.Data);
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.Data)
+                .AppendSuccess();
             ReadBuffer ??= new byte[PacketSize];
             // 避免多次申请内存
             if (ReadBuffer.Length < PacketSize)
                 ReadBuffer = new byte[PacketSize];
             var count = FileStream.Read(ReadBuffer, 0, PacketSize);
-            CommandSucceed(ReadBuffer, 0, count);
+            SendCommand(commandComposer, ReadBuffer, 0, count);
             return;
         }
         // 发送完成

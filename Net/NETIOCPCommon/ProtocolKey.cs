@@ -8,7 +8,7 @@ public class ProtocolKey
     public const string LeftBrackets = "[";
     public const string RightBrackets = "]";
     public const string ReturnWrap = "\r\n";
-    public const string EqualSign = "=";
+    public const char EqualSign = '=';
     public const string Command = "Command";
     public const string Code = "Code";
     public const string Message = "Message";
