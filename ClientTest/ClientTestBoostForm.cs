@@ -95,7 +95,7 @@ public class ClientTestBoostForm : ResizeableForm
         Thread.Sleep(10);
         //
         c2.Connect(ipAddress, port);
-        //c1.Connect(ipAddress, port);
+        c1.Connect(ipAddress, port);
         c1.SendMessage("c1;Hello World;");
         c1.UploadFile(UploadFilePath);
         //
