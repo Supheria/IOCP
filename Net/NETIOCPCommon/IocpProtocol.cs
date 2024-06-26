@@ -21,10 +21,6 @@ public abstract class IocpProtocol : IDisposable
 
     protected AsyncSendBufferManager SendBuffer { get; } = new(ConstTabel.InitBufferSize);
 
-    //protected CommandComposer CommandComposer { get; } = new();
-
-    //protected CommandParser CommandParser { get; } = new();
-
     public string FilePath { get; protected set; } = "";
 
     protected byte[]? ReadBuffer { get; set; } = null;
@@ -158,6 +154,7 @@ public abstract class IocpProtocol : IDisposable
             SendCallback();
     }
 
+    // TODO: refine and remove this
     protected virtual void SendCallback()
     {
 
