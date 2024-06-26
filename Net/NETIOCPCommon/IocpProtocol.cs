@@ -23,7 +23,7 @@ public abstract class IocpProtocol : IDisposable
 
     protected CommandComposer CommandComposer { get; } = new();
 
-    protected CommandParser CommandParser { get; } = new();
+    //protected CommandParser CommandParser { get; } = new();
 
     public string FilePath { get; protected set; } = "";
 
@@ -121,12 +121,11 @@ public abstract class IocpProtocol : IDisposable
             return;
         var commandLength = BitConverter.ToInt32(buffer, offset); //取出命令长度
         var command = Encoding.UTF8.GetString(buffer, offset + sizeof(int), commandLength);
-        if (!CommandParser.DecodeProtocolText(command)) //解析命令
-            return;
-        ProcessCommand(buffer, offset + sizeof(int) + commandLength, count - sizeof(int) - sizeof(int) - commandLength); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - length，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
+        var commandParser = CommandParser.Parse(command);
+        ProcessCommand(commandParser, buffer, offset + sizeof(int) + commandLength, count - sizeof(int) - sizeof(int) - commandLength); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - length，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
     }
 
-    protected abstract void ProcessCommand(byte[] buffer, int offset, int count);
+    protected abstract void ProcessCommand(CommandParser commandParser, byte[] buffer, int offset, int count);
 
     public void SendAsync(byte[] buffer, int offset, int count)
     {

@@ -52,7 +52,7 @@ partial class ClientProtocol : IocpProtocol
         }
     }
 
-    protected override void ProcessCommand(byte[] buffer, int offset, int count)
+    protected override void ProcessCommand(CommandParser commandParser, byte[] buffer, int offset, int count)
     {
         ////CommandComposer.Clear();
         ////CommandComposer.AddResponse();
@@ -60,10 +60,13 @@ partial class ClientProtocol : IocpProtocol
         //var command = StrToCommand(CommandParser.Command);
         //if (!CheckLogin(command)) //检测登录
         //    return CommandFail(ProtocolCode.UserHasLogined, "");
-        switch (CommandParser.Command)
+        if (!CheckErrorCode(commandParser))
+            return;
+        commandParser.GetValueAsString(ProtocolKey.Command, out var command);
+        switch (command)
         {
             case ProtocolKey.Login:
-                DoLogin();
+                DoLogin(commandParser);
                 return;
             case ProtocolKey.Active:
                 DoActive();
@@ -78,7 +81,7 @@ partial class ClientProtocol : IocpProtocol
                 DoDownload();
                 return;
             case ProtocolKey.SendFile:
-                DoSendFile();
+                DoSendFile(commandParser);
                 return;
             case ProtocolKey.Data:
                 DoData(buffer, offset, count);
@@ -90,12 +93,12 @@ partial class ClientProtocol : IocpProtocol
 
     private void DoActive()
     {
-        if (CheckErrorCode())
+        //if (CheckErrorCode())
         {
             IsLogin = true;
         }
-        else
-            IsLogin = false;
+        //else
+        //    IsLogin = false;
     }
 
     private void DoMessage(byte[] buffer, int offset, int count)
@@ -112,25 +115,22 @@ partial class ClientProtocol : IocpProtocol
         }
     }
 
-    private void DoLogin()
+    private void DoLogin(CommandParser commandParser)
     {
-        if (CheckErrorCode())//返回登录成功
-        {
-            UserInfo.Id = CommandParser.Values[1];
-            UserInfo.Name = CommandParser.Values[2];
-            IsLogin = true;
-        }
+        if (!commandParser.GetValueAsString(ProtocolKey.UserID, out var id) ||
+            !commandParser.GetValueAsString(ProtocolKey.UserName, out var name))
+            IsLogin = false;
         else
         {
-            IsLogin = false;
+            UserInfo.Id = id;
+            UserInfo.Name = name;
+            IsLogin = true;
         }
         LoginDone.Set();//登录结束
     }
 
     private void DoDownload()
     {
-        if (!CheckErrorCode())//文件在服务端是否在使用、是否存在
-            return;
         if (File.Exists(FilePath))
             return;
         // 本地不存在，则创建
@@ -145,13 +145,11 @@ partial class ClientProtocol : IocpProtocol
         catch { }
     }
 
-    private void DoSendFile()
+    private void DoSendFile(CommandParser commandParser)
     {
-        if (!CheckErrorCode())
-            return;
         if (!IsSendingFile)
         {
-            CommandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize);
+            commandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize);
             FileSize = fileSize;
             return;
         }
@@ -169,8 +167,6 @@ partial class ClientProtocol : IocpProtocol
 
     private void DoData(byte[] buffer, int offset, int count)
     {
-        if (!CheckErrorCode())
-            return;
         // 下载文件
         if (!IsSendingFile)
         {

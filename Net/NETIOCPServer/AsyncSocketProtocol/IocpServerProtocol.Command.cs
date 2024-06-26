@@ -45,20 +45,22 @@ partial class ServerProtocol : IocpProtocol
     /// <param name="offset"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    protected override void ProcessCommand(byte[] buffer, int offset, int count)
+    protected override void ProcessCommand(CommandParser commandParser, byte[] buffer, int offset, int count)
     {
+        if (!commandParser.GetValueAsString(ProtocolKey.Command, out var command))
+            return;
         CommandComposer.Clear();
         CommandComposer.AddResponse();
-        CommandComposer.AddCommand(CommandParser.Command);
-        if (!CheckLogin()) //检测登录
+        CommandComposer.AddCommand(command);
+        if (!CheckLogin(command)) //检测登录
         {
             CommandFail(ProtocolCode.UserHasLogined, "");
             return;
         }
-        switch (CommandParser.Command)
+        switch (command)
         {
             case ProtocolKey.Login:
-                DoLogin();
+                DoLogin(commandParser);
                 return;
             case ProtocolKey.Active:
                 DoActive();
@@ -67,10 +69,10 @@ partial class ServerProtocol : IocpProtocol
                 DoMessage(buffer, offset, count);
                 return;
             case ProtocolKey.Upload:
-                DoUpload();
+                DoUpload(commandParser);
                 return;
             case ProtocolKey.Download:
-                DoDownload();
+                DoDownload(commandParser);
                 return;
             case ProtocolKey.SendFile:
                 DoSendFile();
@@ -101,9 +103,9 @@ partial class ServerProtocol : IocpProtocol
         SendCommand(buffer, offset, count);
     }
 
-    private bool CheckLogin()
+    private bool CheckLogin(string command)
     {
-        if (CommandParser.Command is ProtocolKey.Login || CommandParser.Command is ProtocolKey.Active)
+        if (command is ProtocolKey.Login || command is ProtocolKey.Active)
             return true;
         else
             return IsLogin;
@@ -148,11 +150,11 @@ partial class ServerProtocol : IocpProtocol
     /// 处理客户端文件上传
     /// </summary>
     /// <returns></returns>
-    public void DoUpload()
+    public void DoUpload(CommandParser commandParser)
     {
-        if (!CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir) ||
-            !CommandParser.GetValueAsString(ProtocolKey.FileName, out var filePath) ||
-            !CommandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize) /*||*/
+        if (!commandParser.GetValueAsString(ProtocolKey.DirName, out var dir) ||
+            !commandParser.GetValueAsString(ProtocolKey.FileName, out var filePath) ||
+            !commandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize) /*||*/
             /*!CommandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize)*/)
         {
             CommandFail(ProtocolCode.ParameterError, "");
@@ -189,12 +191,12 @@ partial class ServerProtocol : IocpProtocol
     /// 处理客户端文件下载
     /// </summary>
     /// <returns></returns>
-    public void DoDownload()
+    public void DoDownload(CommandParser commandParser)
     {
-        if (!CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir) ||
-            !CommandParser.GetValueAsString(ProtocolKey.FileName, out var filePath) ||
-            !CommandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize) ||
-            !CommandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize))
+        if (!commandParser.GetValueAsString(ProtocolKey.DirName, out var dir) ||
+            !commandParser.GetValueAsString(ProtocolKey.FileName, out var filePath) ||
+            !commandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize) ||
+            !commandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize))
         {
             CommandFail(ProtocolCode.ParameterError, "");
             return;
@@ -245,10 +247,10 @@ partial class ServerProtocol : IocpProtocol
     }
 
     // TODO: modify this for common-use
-    private void DoLogin()
+    private void DoLogin(CommandParser commandParser)
     {
-        if (!CommandParser.GetValueAsString(ProtocolKey.UserID, out var userId) ||
-            !CommandParser.GetValueAsString(ProtocolKey.Password, out var password))
+        if (!commandParser.GetValueAsString(ProtocolKey.UserID, out var userId) ||
+            !commandParser.GetValueAsString(ProtocolKey.Password, out var password))
         {
             CommandFail(ProtocolCode.ParameterError, "");
             return;
@@ -266,14 +268,14 @@ partial class ServerProtocol : IocpProtocol
         IsLogin = true;
         //ServerInstance.Logger.InfoFormat("{0} login success", userID);
         CommandSucceed(
-            (ProtocolKey.UserID, userId),
-            (ProtocolKey.UserID, userId)
+            (ProtocolKey.UserID, UserInfo.Id),
+            (ProtocolKey.UserName, UserInfo.Name)
             );
     }
 
-    private void DoDir()
+    private void DoDir(CommandParser commandParser)
     {
-        if (!CommandParser.GetValueAsString(ProtocolKey.ParentDir, out var dir))
+        if (!commandParser.GetValueAsString(ProtocolKey.ParentDir, out var dir))
         {
             CommandFail(ProtocolCode.ParameterError, "");
             return;
@@ -301,9 +303,9 @@ partial class ServerProtocol : IocpProtocol
         }
     }
 
-    private void DoFileList()
+    private void DoFileList(CommandParser commandParser)
     {
-        if (!CommandParser.GetValueAsString(ProtocolKey.DirName, out var dir))
+        if (!commandParser.GetValueAsString(ProtocolKey.DirName, out var dir))
         {
             CommandFail(ProtocolCode.ParameterError, "");
             return;

@@ -70,9 +70,9 @@ public partial class ClientProtocol
         SocketInfo.Connect(connectArgs.ConnectSocket);
     }
 
-    public bool CheckErrorCode()
+    public bool CheckErrorCode(CommandParser commandParser)
     {
-        CommandParser.GetValueAsInt(ProtocolKey.Code, out var errorCode);
+        commandParser.GetValueAsInt(ProtocolKey.Code, out var errorCode);
         if (errorCode == ProtocolCode.Success)
             return true;
         else

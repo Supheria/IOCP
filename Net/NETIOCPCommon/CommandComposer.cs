@@ -21,22 +21,22 @@ public class CommandComposer
 
     public void AddRequest()
     {
-        var str = new StringBuilder()
-            .Append(ProtocolKey.LeftBrackets)
-            .Append(ProtocolKey.Request)
-            .Append(ProtocolKey.RightBrackets)
-            .ToString();
-        ProtocolText.Add(str);
+        //var str = new StringBuilder()
+        //    .Append(ProtocolKey.LeftBrackets)
+        //    //.Append(ProtocolKey.Request)
+        //    .Append(ProtocolKey.RightBrackets)
+        //    .ToString();
+        //ProtocolText.Add(str);
     }
 
     public void AddResponse()
     {
-        var str = new StringBuilder()
-            .Append(ProtocolKey.LeftBrackets)
-            .Append(ProtocolKey.Response)
-            .Append(ProtocolKey.RightBrackets)
-            .ToString();
-        ProtocolText.Add(str);
+        //var str = new StringBuilder()
+        //    .Append(ProtocolKey.LeftBrackets)
+        //    //.Append(ProtocolKey.Response)
+        //    .Append(ProtocolKey.RightBrackets)
+        //    .ToString();
+        //ProtocolText.Add(str);
     }
 
     public void AddCommand(string commandKey)
