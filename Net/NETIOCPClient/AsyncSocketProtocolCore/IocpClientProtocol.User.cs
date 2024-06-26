@@ -39,8 +39,6 @@ partial class IocpClientProtocol
 
     object Locker { get; } = new();
 
-    object CloseLocker { get; } = new();
-
     public void Connect(string host, int port)
     {
         if (IsConnect)
@@ -96,15 +94,10 @@ partial class IocpClientProtocol
 
     public void Close()
     {
-        //CloseDone.WaitOne();
-        //CloseDone.Reset();
         lock (CloseDone)
         {
             if (Socket is null || !IsConnect)
-            {
-                //CloseDone.Set();
                 return;
-            }
             try
             {
                 Socket.Shutdown(SocketShutdown.Both);
@@ -115,12 +108,11 @@ partial class IocpClientProtocol
             }
             ReceiveBuffer.Clear();
             SendBuffer.ClearPacket();
-            // TODO: Dispose
             Socket.Close();
             Socket = null;
+            Dispose();
             SocketInfo.Disconnect();
             IsConnect = false;
-            //CloseDone.Set();
         }
 
     }
@@ -134,7 +126,7 @@ partial class IocpClientProtocol
         receiveArgs.Completed += (_, args) => ProcessReceive(args);
         if (Socket is not null && !Socket.ReceiveAsync(receiveArgs))
         {
-            lock (Locker)
+            lock (Socket)
                 ProcessReceive(receiveArgs);
         }
     }

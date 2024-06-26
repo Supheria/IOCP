@@ -23,12 +23,13 @@ partial class IocpServerProtocol : IDisposable
         SendFile = 9
     }
 
+    bool IsLogin { get; set; } = false;
+
     int PacketSize { get; set; } = 64 * 1024;
 
+    public string FilePath { get; private set; } = "";
 
     byte[]? ReadBuffer { get; set; } = null;
-
-    public string FilePath { get; private set; } = "";
 
     FileStream? FileStream { get; set; } = null;
 
@@ -41,8 +42,6 @@ partial class IocpServerProtocol : IDisposable
     long ReceivedFileSize { get; set; } = 0;
 
     UserInfo UserInfo { get; } = new();
-
-    bool IsLogin { get; set; } = false;
 
     // TODO: make the dir more common-useable
     public DirectoryInfo RootDirectory { get; set; } = Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "upload"));
@@ -78,41 +77,43 @@ partial class IocpServerProtocol : IDisposable
     /// <param name="offset"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    protected bool ProcessCommand(byte[] buffer, int offset, int count)
+    protected void ProcessCommand(byte[] buffer, int offset, int count)
     {
         CommandComposer.Clear();
         CommandComposer.AddResponse();
         CommandComposer.AddCommand(CommandParser.Command);
         var command = StrToCommand(CommandParser.Command);
         if (!CheckLogin(command)) //检测登录
-            return CommandFail(ProtocolCode.UserHasLogined, "");
-        try
         {
-            return command switch
-            {
-                Command.Login => DoLogin(),
-                Command.Active => DoActive(),
-                Command.Message => DoHandleMessage(buffer, offset, count),
-                Command.Dir => DoDir(),
-                Command.FileList => DoFileList(),
-                Command.Download => DoDownload(),
-                Command.Upload => DoUpload(),
-                Command.SendFile => DoSendFile(),
-                Command.Data => DoData(buffer, offset, count),
-                _ => throw new ServerProtocolException("Unknow command: " + CommandParser.Command)
-            };
+            _ = CommandFail(ProtocolCode.UserHasLogined, "");
+            return;
         }
-        catch (Exception ex)
+        switch (command)
         {
-            return CommandFail(ProtocolCode.ParameterError, ex.Message);
-            //ServerInstance.Logger.Error("Unknow command: " + CommandParser.Command);
-            //return false;
+            case Command.Login:
+                DoLogin();
+                return;
+            case Command.Active:
+                DoActive();
+                return;
+            case Command.Message:
+                DoMessage(buffer, offset, count);
+                return;
+            case Command.Upload:
+                DoUpload();
+                return;
+            case Command.Download:
+                DoDownload();
+                return;
+            case Command.SendFile:
+                DoSendFile();
+                return;
+            case Command.Data:
+                DoData(buffer, offset, count);
+                return;
+            default:
+                return;
         }
-    }
-
-    public bool DoActive()
-    {
-        return CommandSucceed();
     }
 
     /// <summary>
@@ -154,6 +155,11 @@ partial class IocpServerProtocol : IDisposable
             return true;
         else
             return IsLogin;
+    }
+
+    public bool DoActive()
+    {
+        return CommandSucceed();
     }
 
     public bool DoSendFile()
@@ -259,7 +265,7 @@ partial class IocpServerProtocol : IDisposable
         return CommandSucceed();
     }
 
-    private bool DoHandleMessage(byte[] buffer, int offset, int count)
+    private bool DoMessage(byte[] buffer, int offset, int count)
     {
         var message = Encoding.UTF8.GetString(buffer, offset, count);
         Server.HandleReceiveMessage(message, this);

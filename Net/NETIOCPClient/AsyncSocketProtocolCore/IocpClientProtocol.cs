@@ -34,15 +34,6 @@ public partial class IocpClientProtocol
     /// </summary>
     protected AsyncSendBufferManager SendBuffer { get; } = new(ConstTabel.ReceiveBufferSize);
 
-    /// <summary>
-    /// 设置SOCKET是否延迟发送
-    /// </summary>
-    /// <param name="NoDelay"></param>
-    //HACK: public void SetNoDelay(bool NoDelay)
-    //{
-    //    Client.Core.NoDelay = NoDelay;
-    //}
-
     public void SendCommand()
     {
         SendCommand([], 0, 0);

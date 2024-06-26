@@ -51,24 +51,29 @@ partial class IocpServerProtocol(IocpServer server)
         return buffer;
     }
 
+    ManualResetEvent CloseDone { get; } = new(true);
+
     public bool Close()
     {
-        try
+        lock (CloseDone)
         {
-            Socket?.Shutdown(SocketShutdown.Both);
+            try
+            {
+                Socket?.Shutdown(SocketShutdown.Both);
+            }
+            catch (Exception ex)
+            {
+                //Program.Logger.ErrorFormat("CloseClientSocket Disconnect client {0} error, message: {1}", socketInfo, ex.Message);
+            }
+            Socket?.Close();
+            Socket = null;
+            ReceiveBuffer.Clear();
+            SendBuffer.ClearPacket();
+            Dispose();
+            SocketInfo.Disconnect();
+            OnClosed?.Invoke();
+            return true;
         }
-        catch (Exception ex)
-        {
-            //Program.Logger.ErrorFormat("CloseClientSocket Disconnect client {0} error, message: {1}", socketInfo, ex.Message);
-        }
-        Socket?.Close();
-        Socket = null;
-        ReceiveBuffer.Clear();
-        SendBuffer.ClearPacket();
-        Dispose();
-        SocketInfo.Disconnect();
-        OnClosed?.Invoke();
-        return true;
     }
 
     public void ReceiveAsync()
@@ -132,15 +137,15 @@ partial class IocpServerProtocol(IocpServer server)
     /// <param name="offset"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    private bool HandlePacket(byte[] buffer, int offset, int count)
+    private void HandlePacket(byte[] buffer, int offset, int count)
     {
         if (count < sizeof(int))
-            return false;
-        var length = BitConverter.ToInt32(buffer, offset); //取出命令长度
-        var command = Encoding.UTF8.GetString(buffer, offset + sizeof(int), length);
+            return;
+        var commandLength = BitConverter.ToInt32(buffer, offset); //取出命令长度
+        var command = Encoding.UTF8.GetString(buffer, offset + sizeof(int), commandLength);
         if (!CommandParser.DecodeProtocolText(command)) //解析命令
-            return false;
-        return ProcessCommand(buffer, offset + sizeof(int) + length, count - sizeof(int) - sizeof(int) - length); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - length，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
+            return;
+        ProcessCommand(buffer, offset + sizeof(int) + commandLength, count - sizeof(int) - sizeof(int) - commandLength); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - length，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
     }
 
     public void SendAsync(byte[] buffer, int offset, int count)

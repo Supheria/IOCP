@@ -50,7 +50,7 @@ public class ClientOperator
         {
             ClientFullHandlerSocket_MSG.Connect(ipAddress, port);//增强实时性，使用无延迟发送
             ClientFullHandlerSocket_MSG.OnConnect += OnConncet;
-            ClientFullHandlerSocket_MSG.LocalFilePath = @"d:\temp";
+            ClientFullHandlerSocket_MSG.RootDirectoryPath = @"d:\temp";
             ClientFullHandlerSocket_MSG.OnReceiveMessage += appHandler_OnReceivedMsg;//接收到消息后处理事件
             ClientFullHandlerSocket_MSG.ReceiveAsync();
         }
@@ -123,7 +123,7 @@ public class ClientOperator
             ClientFullHandlerSocket_UPLOAD = new();
             ClientFullHandlerSocket_UPLOAD.OnUpload += UploadEvent_UploadProcess; // 只挂接上传事件
             ClientFullHandlerSocket_UPLOAD.Connect("127.0.0.1", 8000);
-            ClientFullHandlerSocket_UPLOAD.LocalFilePath = @"d:\temp";
+            ClientFullHandlerSocket_UPLOAD.RootDirectoryPath = @"d:\temp";
             ClientFullHandlerSocket_UPLOAD.ReceiveAsync();
             ClientFullHandlerSocket_UPLOAD.Login("admin", "password");
         }
@@ -137,7 +137,7 @@ public class ClientOperator
             ClientFullHandlerSoclet_DOWNLOAD = new();
             ClientFullHandlerSoclet_DOWNLOAD.OnDownload += DownLoadEvent_DownLoadProcess; // 只挂接下载事件
             ClientFullHandlerSoclet_DOWNLOAD.Connect("127.0.0.1", 8000);
-            ClientFullHandlerSoclet_DOWNLOAD.LocalFilePath = "download";
+            ClientFullHandlerSoclet_DOWNLOAD.RootDirectoryPath = "download";
             ClientFullHandlerSoclet_DOWNLOAD.ReceiveAsync();
             ClientFullHandlerSoclet_DOWNLOAD.Login("admin", "password");
         }

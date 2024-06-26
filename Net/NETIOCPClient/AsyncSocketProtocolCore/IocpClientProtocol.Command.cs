@@ -7,13 +7,10 @@ using System.Text;
 
 namespace Net;
 
-public static class StaticResetevent
+partial class IocpClientProtocol : IDisposable
 {
-    public static AutoResetEvent Done = new AutoResetEvent(false);
-}
+    public AutoResetEvent Done = new AutoResetEvent(false);
 
-partial class IocpClientProtocol
-{
     enum Command
     {
         None = 0,
@@ -28,17 +25,15 @@ partial class IocpClientProtocol
         SendFile = 9
     }
 
-    int PacketLength { get; set; } = 0;
-
-    int PacketReceived { get; set; } = 0;
-
-    public UserInfo LoginUser { get; } = new();
-
-    bool BnetWorkOperate { get; set; } = false;
+    bool IsLogin { get; set; } = false;
 
     public int PacketSize { get; set; } = 8 * 1024;
 
     public string FilePath { get; private set; } = "";
+
+    byte[]? ReadBuffer { get; set; } = null;
+
+    FileStream? FileStream { get; set; } = null;
 
     /// <summary>
     /// 文件的剩余长度
@@ -53,19 +48,19 @@ partial class IocpClientProtocol
     /// <summary>
     /// 本地保存文件的路径,不含文件名
     /// </summary>
-    public string LocalFilePath { get; set; } = "";
-
-    // HACK: public string LocalIp { get { return ((IPEndPoint)Client.Core.LocalEndPoint).Address.ToString(); } }
-
-    FileStream? FileStream { get; set; } = null;
+    public string RootDirectoryPath { get; set; } = "";
 
     bool IsSendingFile { get; set; } = false;
 
-    byte[]? ReadBuffer { get; set; } = null;
-
     public UserInfo UserInfo { get; } = new();
 
-    protected string ErrorString { get; set; } = "";
+    public void Dispose()
+    {
+        FilePath = "";
+        FileStream?.Close();
+        FileStream = null;
+        GC.SuppressFinalize(this);
+    }
 
     /// <summary>
     /// 向服务端发送消息，由消息来驱动业务逻辑，接收方必须返回应答，否则认为发送失败
@@ -104,36 +99,27 @@ partial class IocpClientProtocol
         //    return CommandFail(ProtocolCode.UserHasLogined, "");
         switch (command)
         {
-            //Command.Login => DoLogin(),
-            //Command.Active => Active(),
-            //Command.Message => DoHandleMessage(buffer, offset, count),
-            //Command.Dir => DoDir(),
-            //Command.FileList => DoFileList(),
-            //Command.Download => DoDownload(),
-            //Command.Upload => DoUpload(),
-            //Command.SendFile => DoSendFile(),
-            //Command.Data => DoData(buffer, offset, count),
-            case Command.Active:
-                DoActive();
-                break;
-            case Command.Message:
-                DoMessage(buffer, offset, count);
-                break;
             case Command.Login:
                 DoLogin();
-                break;
-            case Command.Download:
-                DoDownload();
-                break;
-            case Command.SendFile:
-                DoSendFile();
-                break;
-            case Command.Data:
-                DoData(buffer, offset, count);
-                break;
+                return;
+            case Command.Active:
+                DoActive();
+                return;
+            case Command.Message:
+                DoMessage(buffer, offset, count);
+                return;
             case Command.Upload:
                 DoUpload();
-                break;
+                return;
+            case Command.Download:
+                DoDownload();
+                return;
+            case Command.SendFile:
+                DoSendFile();
+                return;
+            case Command.Data:
+                DoData(buffer, offset, count);
+                return;
             default:
                 return;
         };
@@ -171,16 +157,14 @@ partial class IocpClientProtocol
     {
         if (CheckErrorCode())
         {
-            BnetWorkOperate = true;
+            IsLogin = true;
         }
         else
-            BnetWorkOperate = false;
+            IsLogin = false;
     }
 
     private void DoMessage(byte[] buffer, int offset, int count)
     {
-        //HACK: int offset = commandLen + sizeof(int) + sizeof(int);//前8个字节为包长度+命令长度
-        //HACK: size = PacketLength - offset;
         string message = Encoding.UTF8.GetString(buffer, offset, count);
 #if DEBUG
         if (message != string.Empty)
@@ -199,13 +183,13 @@ partial class IocpClientProtocol
         {
             UserInfo.Id = CommandParser.Values[1];
             UserInfo.Name = CommandParser.Values[2];
-            BnetWorkOperate = true;
+            IsLogin = true;
         }
         else
         {
-            BnetWorkOperate = false;
+            IsLogin = false;
         }
-        StaticResetevent.Done.Set();//登录结束
+        Done.Set();//登录结束
     }
 
     private void DoDownload()
@@ -274,7 +258,7 @@ partial class IocpClientProtocol
                 else //发送文件数据结束
                 {
                     IsSendingFile = false;
-                    StaticResetevent.Done.Set();//上传结束 
+                    //StaticResetevent.Done.Set();//上传结束 
                     PacketSize = PacketSize / 8;//文件传输时将包大小放大8倍,传输完成后还原为原来大小
                     HandleUpload();
                 }
@@ -305,7 +289,7 @@ partial class IocpClientProtocol
                     Console.ForegroundColor = ConsoleColor.White;
 #endif
 
-                    StaticResetevent.Done.Set();//下载完成
+                    //StaticResetevent.Done.Set();//下载完成
                     HandleDownload();
                 }
             }
@@ -339,13 +323,12 @@ partial class IocpClientProtocol
             CommandComposer.AddValue(ProtocolKey.Password, password);
             UserInfo.Password = password;
             SendCommand();
-            StaticResetevent.Done.WaitOne();//登录阻塞，强制同步
-            return BnetWorkOperate;
+            Done.WaitOne();//登录阻塞，强制同步
+            return IsLogin;
         }
         catch (Exception E)
         {
             //记录日志
-            ErrorString = E.Message;
             //Logger.Error("AsyncClientFullHandlerSocket.DoLogin" + "userID:" + userID + " password:" + password + " " + E.Message);
             return false;
         }
@@ -389,7 +372,7 @@ partial class IocpClientProtocol
         try
         {
             long fileSize = 0;
-            FilePath = Path.Combine(LocalFilePath + pathLastLevel, fileName);
+            FilePath = Path.Combine(RootDirectoryPath + pathLastLevel, fileName);
             if (File.Exists(FilePath))//支持断点续传，如果有未下载完成的，则接着下载
             {
                 if (!BasicFunc.IsFileInUse(FilePath)) //检测文件是否正在使用中
@@ -414,8 +397,7 @@ partial class IocpClientProtocol
         }
         catch (Exception E)
         {
-            //记录日志  
-            ErrorString = E.Message;
+            //记录日志
             //Logger.Error(E.Message);
         }
     }
@@ -454,8 +436,7 @@ partial class IocpClientProtocol
         }
         catch (Exception e)
         {
-            //记录日志  
-            ErrorString = e.Message;
+            //记录日志
             //Logger.Error(e.Message);
         }
     }
