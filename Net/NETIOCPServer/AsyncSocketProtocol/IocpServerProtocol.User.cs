@@ -10,9 +10,9 @@ partial class IocpServerProtocol(IocpServer server)
     IocpServer Server { get; } = server;
 
     Socket? Socket { get; set; } = null;
-    
+
     DynamicBufferManager ReceiveBuffer { get; } = new(ConstTabel.InitBufferSize);
-    
+
     AsyncSendBufferManager SendBuffer { get; } = new(ConstTabel.InitBufferSize);
 
     public SocketInfo SocketInfo { get; } = new();

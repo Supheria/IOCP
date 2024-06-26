@@ -1,6 +1,4 @@
-﻿using log4net;
-using log4net.Repository.Hierarchy;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
