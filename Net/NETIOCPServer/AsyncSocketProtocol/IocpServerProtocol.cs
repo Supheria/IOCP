@@ -30,25 +30,23 @@ public partial class IocpServerProtocol
     /// </summary>
     bool IsSendingAsync { get; set; } = false;
 
-    protected bool CommandFail(int errorCode, string message)
+    protected void CommandFail(int errorCode, string message)
     {
         CommandComposer.AddFailure(errorCode, message);
         SendCommand();
-        return false;
     }
 
-    protected bool CommandSucceed(params (string Key, object value)[] addValues)
+    protected void CommandSucceed(params (string Key, object value)[] addValues)
     {
-        return CommandSucceed([], 0, 0, addValues);
+        CommandSucceed([], 0, 0, addValues);
     }
 
-    protected bool CommandSucceed(byte[] buffer, int offset, int count, params (string Key, object value)[] addValues)
+    protected void CommandSucceed(byte[] buffer, int offset, int count, params (string Key, object value)[] addValues)
     {
         CommandComposer.AddSuccess();
         foreach (var (key, value) in addValues)
             CommandComposer.AddValue(key, value.ToString() ?? "");
         SendCommand(buffer, offset, count);
-        return true;
     }
 
     protected void SendCommand()

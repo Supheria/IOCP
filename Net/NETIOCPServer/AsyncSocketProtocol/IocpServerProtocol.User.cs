@@ -193,7 +193,7 @@ partial class IocpServerProtocol(IocpServer server)
             CommandComposer.Clear();
             CommandComposer.AddResponse();
             CommandComposer.AddCommand(ProtocolKey.SendFile);
-            _ = CommandSucceed((ProtocolKey.FileSize, FileStream.Length - FileStream.Position));
+            CommandSucceed((ProtocolKey.FileSize, FileStream.Length - FileStream.Position));
             IsSendingFile = false;
             return;
         }
@@ -211,7 +211,7 @@ partial class IocpServerProtocol(IocpServer server)
             if (ReadBuffer.Length < PacketSize)
                 ReadBuffer = new byte[PacketSize];
             var count = FileStream.Read(ReadBuffer, 0, PacketSize);
-            _ = CommandSucceed(ReadBuffer, 0, count);
+            CommandSucceed(ReadBuffer, 0, count);
             return;
         }
         // 发送完成
