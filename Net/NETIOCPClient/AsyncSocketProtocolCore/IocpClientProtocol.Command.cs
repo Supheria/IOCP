@@ -1,32 +1,21 @@
 ﻿using LocalUtilities.TypeToolKit.Text;
 using System.IO;
 using System.Text;
+using System.Xml.Linq;
 using static Net.ServerProtocol;
 
 namespace Net;
 
 partial class ClientProtocol : IocpProtocol
 {
-    public int PacketSize { get; set; } = 8 * 1024;
-
-    /// <summary>
-    /// 文件的剩余长度
-    /// </summary>
-    long FileSize { get; set; } = 0;
-
-    /// <summary>
-    /// 本次文件已经接收的长度
-    /// </summary>
-    long ReceviedLength { get; set; } = 0;
-
     /// <summary>
     /// 本地保存文件的路径,不含文件名
     /// </summary>
     public string RootDirectoryPath { get; set; } = "";
 
-    bool IsSendingFile { get; set; } = false;
-
     public AutoResetEvent LoginDone { get; } = new(false);
+
+    public AutoResetEvent ConnectDone { get; } = new(false);
 
     public delegate void HandleProgress(string progress);
 
@@ -34,53 +23,32 @@ partial class ClientProtocol : IocpProtocol
 
     public event HandleProgress? OnDownloading;
 
-    Dictionary<string, AutoDisposeFileStream> FileReaders { get; } = [];
-
-    Dictionary<string, AutoDisposeFileStream> FileWriters { get; } = [];
-
-    /// <summary>
-    /// 向服务端发送消息，由消息来驱动业务逻辑，接收方必须返回应答，否则认为发送失败
-    /// </summary>
-    /// <param name="msg">消息内容</param>
     public void SendMessage(string message)
     {
-        var commandComposer = new CommandComposer()
-            .AppendCommand(ProtocolKey.Message);
-        var buffer = Encoding.UTF8.GetBytes(message);
         try
         {
+            if (!CheckConnection())
+                throw new ClientProtocolException(ProtocolCode.Disconnection);
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.Message);
+            var buffer = Encoding.UTF8.GetBytes(message);
             SendCommand(commandComposer, buffer, 0, buffer.Length);
         }
         catch (Exception ex)
         {
-            //logger.Error("SendMessage error:" + e.Message);
-            if (!ReConnectAndLogin()) // 检测连接是否还在，如果断开则重连并登录
-            {
-                //Logger.Error("AsyncClientFullHandlerSocket.SendMessage:" + "Socket disconnect");
-                throw new ClientProtocolException(ProtocolCode.Disconnection, "Server is Stoped"); //抛异常是为了让前台知道网络链路的情况         
-            }
-            new Task(() => SendMessage(message)).Start();
+            HandleException(ex);
         }
     }
 
     protected override void ProcessCommand(CommandParser commandParser, byte[] buffer, int offset, int count)
     {
-        ////CommandComposer.Clear();
-        ////CommandComposer.AddResponse();
-        ////CommandComposer.AddCommand(CommandParser.Command);
-        //var command = StrToCommand(CommandParser.Command);
-        //if (!CheckLogin(command)) //检测登录
-        //    return CommandFail(ProtocolCode.UserHasLogined, "");
         if (!CheckErrorCode(commandParser))
             return;
         commandParser.GetValueAsString(ProtocolKey.Command, out var command);
         switch (command)
         {
             case ProtocolKey.Login:
-                DoLogin(commandParser);
-                return;
-            case ProtocolKey.Active:
-                DoActive();
+                DoLogin();
                 return;
             case ProtocolKey.Message:
                 DoMessage(buffer, offset, count);
@@ -91,50 +59,27 @@ partial class ClientProtocol : IocpProtocol
             case ProtocolKey.Download:
                 DoDownload(commandParser, buffer, offset, count);
                 return;
-            case ProtocolKey.Data:
-                DoData(buffer, offset, count);
+            case ProtocolKey.CheckConnection:
+                DoCheckConnection();
                 return;
             default:
                 return;
         };
     }
 
-    private void DoActive()
-    {
-        //if (CheckErrorCode())
-        {
-            IsLogin = true;
-        }
-        //else
-        //    IsLogin = false;
-    }
-
     private void DoMessage(byte[] buffer, int offset, int count)
     {
         string message = Encoding.UTF8.GetString(buffer, offset, count);
-#if DEBUG
-        if (message != string.Empty)
-            Console.WriteLine("Message Recevied from Server: " + message);
-#endif
-        //DoHandleMessage
         if (!string.IsNullOrWhiteSpace(message))
         {
-            HandleReceiveMessage(message);
+            HandleMessage(message);
         }
     }
 
-    private void DoLogin(CommandParser commandParser)
+    private void DoLogin()
     {
-        if (!commandParser.GetValueAsString(ProtocolKey.UserID, out var id) ||
-            !commandParser.GetValueAsString(ProtocolKey.UserName, out var name))
-            IsLogin = false;
-        else
-        {
-            UserInfo.Id = id;
-            UserInfo.Name = name;
-            IsLogin = true;
-        }
-        LoginDone.Set();//登录结束
+        IsLogin = true;
+        HandleMessage($"{UserInfo?.Name} logined");
     }
 
     private void DoDownload(CommandParser commandParser, byte[] buffer, int offset, int count)
@@ -169,50 +114,6 @@ partial class ClientProtocol : IocpProtocol
             HandleException(ex);
             // TODO: log fail
         }
-    }
-
-    private void DoData(byte[] buffer, int offset, int count)
-    {
-        // 下载文件
-        if (!IsSendingFile)
-        {
-            try
-            {
-                FileStream ??= new FileStream(FilePath, FileMode.Open, FileAccess.ReadWrite);
-            }
-            catch
-            {
-                return;
-            }
-            FileStream.Position = FileStream.Length; //文件移到末尾                            
-            FileStream.Write(buffer, offset, count);
-            ReceviedLength += count;
-            if (ReceviedLength >= FileSize)
-            {
-                FileStream.Close();
-                FileStream.Dispose();
-                ReceviedLength = 0;
-                HandleDownload();
-            }
-            return;
-        }
-        if (FileStream is null)
-            return;
-        // 发送文件数据结束
-        if (FileStream.Position >= FileStream.Length) 
-        {
-            IsSendingFile = false;
-            PacketSize /= 8;//文件传输时将包大小放大8倍,传输完成后还原为原来大小
-            HandleUploaded();
-            return;
-        }
-        // 发送具体数据
-        var commandComposer = new CommandComposer()
-            .AppendCommand(ProtocolKey.Data);
-        ReadBuffer ??= new byte[PacketSize];
-        // 读取剩余文件数据
-        var countRemain = FileStream.Read(ReadBuffer, 0, PacketSize);
-        SendCommand(commandComposer, ReadBuffer, 0, countRemain);
     }
 
     private void DoUpload(CommandParser commandParser)
@@ -251,70 +152,43 @@ partial class ClientProtocol : IocpProtocol
         }
     }
 
-    public bool Login(string userID, string password)
+    public void Login(string name, string password)
     {
-        try
-        {
-            var commandComposer = new CommandComposer()
-                .AppendCommand(ProtocolKey.Login)
-                .AppendValue(ProtocolKey.UserID, userID)
-                .AppendValue(ProtocolKey.Password, password);
-            //CommandComposer.AddValue(ProtocolKey.Password, IocpServer.BasicFunc.MD5String(password));
-            UserInfo.Password = password;
-            SendCommand(commandComposer);
-            LoginDone.WaitOne();//登录阻塞，强制同步
-            return IsLogin;
-        }
-        catch (Exception ex)
-        {
-            HandleException(ex);
-            //记录日志
-            //Logger.Error("AsyncClientFullHandlerSocket.DoLogin" + "userID:" + userID + " password:" + password + " " + E.Message);
-            return false;
-        }
+        UserInfo = new(name, password);
+        Login();
     }
 
-    /// <summary>
-    /// 检测连接是否还在，如果断开则重连并登录
-    /// </summary>
-    /// <returns></returns>
-    public bool ReConnectAndLogin()//重新定义，防止使用基类的方法
+    private void Login()
     {
-        if (BasicFunc.SocketConnected(Socket) && Active())
-            return true;
         try
         {
-            Socket?.Close();
-            Connect(SocketInfo.RemoteEndPoint);
-            ReceiveAsync();
-            return Login(UserInfo.Id, UserInfo.Password);
+            if (UserInfo is null)
+                throw new ClientProtocolException(ProtocolCode.NotLogined);
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.Login)
+                .AppendValue(ProtocolKey.UserName, UserInfo.Name)
+                .AppendValue(ProtocolKey.Password, UserInfo.Password);
+            SendCommand(commandComposer);
         }
         catch (Exception ex)
         {
             HandleException(ex);
-            //Logger.Error("AsyncClientFullHandlerSocket.ReConnectAndLogin" + "userID:" + UserID + " password:" + Password + " " + E.Message);
-            return false;
+            // TODO: log fail
+            //Logger.Error("AsyncClientFullHandlerSocket.DoLogin" + "userID:" + userID + " password:" + password + " " + E.Message);
         }
     }
 
     public void Upload(string filePath, string remoteDir, string remoteName)
     {
-        if (!ReConnectAndLogin())
-        {
-            //Logger.Error("<Upload>ClientFullHandlerSocket连接断开,并且无法重连");
-            return;
-        }
         try
         {
-            //long fileSize = 0;
+            if (!CheckConnection())
+                throw new ClientProtocolException(ProtocolCode.Disconnection);
             if (!File.Exists(filePath))
-            {
-                //Logger.Error("Start Upload file error, file is not exists: " + fileFullPath);
                 throw new ClientProtocolException(ProtocolCode.FileNotExist, filePath);
-            }
             var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             var stamp = DateTime.Now.ToString();
-            var autoFile = new AutoDisposeFileStream(stamp, fileStream, ConstTabel.FileStreamExpireSeconds);
+            var autoFile = new AutoDisposeFileStream(stamp, fileStream, ConstTabel.FileStreamExpireMilliseconds);
             autoFile.OnClosed += (file) => FileReaders.Remove(file.TimeStamp);
             FileReaders[stamp] = autoFile;
             var packetSize = fileStream.Length > ConstTabel.TransferBufferMax ? ConstTabel.TransferBufferMax : fileStream.Length;
@@ -336,13 +210,10 @@ partial class ClientProtocol : IocpProtocol
 
     public void Download(string dirName, string fileName, string pathLastLevel)
     {
-        if (!ReConnectAndLogin())
-        {
-            //Logger.Error("<DoDownload>ClientFullHandlerSocket连接断开,并且无法重连");
-            return;
-        }
         try
         {
+            if (!CheckConnection())
+                throw new ClientProtocolException(ProtocolCode.Disconnection);
             var filePath = Path.Combine(RootDirectoryPath + pathLastLevel, fileName);
             if (File.Exists(filePath))
             {
@@ -355,7 +226,7 @@ partial class ClientProtocol : IocpProtocol
             //FilePath = Path.Combine(RootDirectoryPath + pathLastLevel, fileName);
             var fileStream = new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
             var stamp = DateTime.Now.ToString();
-            var autoFile = new AutoDisposeFileStream(stamp, fileStream, ConstTabel.FileStreamExpireSeconds);
+            var autoFile = new AutoDisposeFileStream(stamp, fileStream, ConstTabel.FileStreamExpireMilliseconds);
             autoFile.OnClosed += (file) => FileWriters.Remove(file.TimeStamp);
             FileWriters[stamp] = autoFile;
             var commandComposer = new CommandComposer()
@@ -371,5 +242,30 @@ partial class ClientProtocol : IocpProtocol
             //记录日志
             //Logger.Error(E.Message);
         }
+    }
+
+    public bool CheckConnection()
+    {
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.CheckConnection);
+        for (var i = 0; i < ConstTabel.ReconnectTimesMax; i++)
+        {
+            SendCommand(commandComposer);
+            ConnectDone.WaitOne(ConstTabel.TimeoutMilliseconds);
+            if (IsLogin)
+                return true;
+            OnMessage?.Invoke($"trying reconnect: {i + 1} times");
+            Connect();
+            ReceiveAsync();
+            Login();
+        }
+        IsLogin = false;
+        return false;
+    }
+
+    private void DoCheckConnection()
+    {
+        IsLogin = true;
+        ConnectDone.Set();
     }
 }

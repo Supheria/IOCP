@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using LocalUtilities.TypeToolKit.Text;
+using System.Text;
 
 namespace Net;
 
@@ -9,24 +10,10 @@ namespace Net;
 /// <param name="userToken"></param>
 partial class ServerProtocol : IocpProtocol
 {
-    int PacketSize { get; set; } = 64 * 1024;
-
-    bool IsSendingFile { get; set; } = false;
-
-    bool IsReceivingFile { get; set; } = false;
-
-    long ReceviedLength { get; set; } = 0;
-
-    long ReceivedFileSize { get; set; } = 0;
-
     // TODO: make the dir more common-useable
     public DirectoryInfo RootDirectory { get; set; } = Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "upload"));
 
     string RootDirectoryPath => RootDirectory.FullName;
-
-    Dictionary<string, AutoDisposeFileStream> FileWriters { get; } = [];
-
-    Dictionary<string, AutoDisposeFileStream> FileReaders { get; } = [];
 
     /// <summary>
     /// 发送消息到客户端，由消息来驱动业务逻辑，接收方必须返回应答，否则认为发送不成功
@@ -62,9 +49,6 @@ partial class ServerProtocol : IocpProtocol
             case ProtocolKey.Login:
                 DoLogin(commandParser);
                 return;
-            case ProtocolKey.Active:
-                DoActive();
-                return;
             case ProtocolKey.Message:
                 DoMessage(buffer, offset, count);
                 return;
@@ -80,8 +64,8 @@ partial class ServerProtocol : IocpProtocol
             case ProtocolKey.SendFile:
                 DoSendFile(commandParser);
                 return;
-            case ProtocolKey.Data:
-                DoData(buffer, offset, count);
+            case ProtocolKey.CheckConnection:
+                DoCheckConnection();
                 return;
             default:
                 return;
@@ -108,41 +92,10 @@ partial class ServerProtocol : IocpProtocol
 
     private bool CheckLogin(string command)
     {
-        if (command is ProtocolKey.Login || command is ProtocolKey.Active)
+        if (command is ProtocolKey.Login)
             return true;
         else
             return IsLogin;
-    }
-
-    private void DoActive()
-    {
-        var commandComposer = new CommandComposer()
-            .AppendCommand(ProtocolKey.Active);
-        CommandSucceed(commandComposer);
-    }
-
-    public void DoData(byte[] buffer, int offset, int count)
-    {
-        if (FileStream is null)
-        {
-            CommandFail(ProtocolCode.NotOpenFile, "");
-            return;
-        }
-        FileStream.Write(buffer, offset, count);
-        ReceviedLength += count;
-        if (ReceviedLength == ReceivedFileSize)
-        {
-            FileStream.Close();
-            FileStream.Dispose();
-            ReceviedLength = 0;
-            IsReceivingFile = false;
-#if DEBUG
-            Server.Tip($"文件接收成功，完成时间{DateTime.Now}", this);
-#endif
-        }
-        var commandComposer = new CommandComposer()
-            .AppendCommand(ProtocolKey.Data);
-        CommandSucceed(commandComposer);
     }
 
     /// <summary>
@@ -167,7 +120,7 @@ partial class ServerProtocol : IocpProtocol
                 // TODO: make this rename
                 File.Delete(filePath);
             var fileStream = new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
-            var autoFile = new AutoDisposeFileStream(stamp, fileStream, ConstTabel.FileStreamExpireSeconds);
+            var autoFile = new AutoDisposeFileStream(stamp, fileStream, ConstTabel.FileStreamExpireMilliseconds);
             autoFile.OnClosed += (file) => FileWriters.Remove(file.TimeStamp);
             FileWriters[autoFile.TimeStamp] = autoFile;
             var commandComposer = new CommandComposer()
@@ -245,7 +198,7 @@ partial class ServerProtocol : IocpProtocol
                 throw new ServerProtocolException(ProtocolCode.DirNotExist, dir);
             filePath = Path.Combine(dir, filePath);
             var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            var autoFile = new AutoDisposeFileStream(stamp, fileStream, ConstTabel.FileStreamExpireSeconds);
+            var autoFile = new AutoDisposeFileStream(stamp, fileStream, ConstTabel.FileStreamExpireMilliseconds);
             autoFile.OnClosed += (file) => FileReaders.Remove(file.TimeStamp);
             FileReaders[stamp] = autoFile;
             var packetSize = fileStream.Length > ConstTabel.TransferBufferMax ? ConstTabel.TransferBufferMax : fileStream.Length;
@@ -324,27 +277,25 @@ partial class ServerProtocol : IocpProtocol
     // TODO: modify this for common-use
     private void DoLogin(CommandParser commandParser)
     {
-        if (!commandParser.GetValueAsString(ProtocolKey.UserID, out var userId) ||
+        if (!commandParser.GetValueAsString(ProtocolKey.UserName, out var name) ||
             !commandParser.GetValueAsString(ProtocolKey.Password, out var password))
         {
             CommandFail(ProtocolCode.ParameterError, "");
             return;
         }
-        var success = userId is "admin" && password is "password";
+        var success = name == "admin" && password == "password".ToMd5HashString();
         if (!success)
         {
             //ServerInstance.Logger.ErrorFormat("{0} login failure,password error", userID);
             CommandFail(ProtocolCode.UserOrPasswordError, "");
             return;
         }
-        UserInfo.Id = userId;
-        UserInfo.Name = userId;
-        UserInfo.Password = password;
+        UserInfo = new(name, password);
         IsLogin = true;
         //ServerInstance.Logger.InfoFormat("{0} login success", userID);
         var commandComposer = new CommandComposer()
             .AppendCommand(ProtocolKey.Login)
-            .AppendValue(ProtocolKey.UserID, UserInfo.Id)
+            .AppendValue(ProtocolKey.UserId, UserInfo.Id)
             .AppendValue(ProtocolKey.UserName, UserInfo.Name);
         CommandSucceed(commandComposer);
     }
@@ -408,5 +359,12 @@ partial class ServerProtocol : IocpProtocol
         {
             CommandFail(ProtocolCode.UnknowError, ex.Message);
         }
+    }
+
+    private void DoCheckConnection()
+    {
+        var commandComposer = new CommandComposer()
+            .AppendCommand(ProtocolKey.CheckConnection);
+        CommandSucceed(commandComposer);
     }
 }

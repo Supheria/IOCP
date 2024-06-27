@@ -28,11 +28,11 @@ public class AutoDisposeFileStream
 
     public event HandleEvent? OnClosed;
 
-    public AutoDisposeFileStream(string timeStamp, FileStream fileStream, int expireSeconds)
+    public AutoDisposeFileStream(string timeStamp, FileStream fileStream, int expireMilliseconds)
     {
         TimeStamp = timeStamp;
         FileStream = fileStream;
-        Timer.Interval = expireSeconds * 1000;
+        Timer.Interval = expireMilliseconds;
         Timer.Elapsed += (_, _) => Close();
         Timer.Start();
     }

@@ -51,7 +51,7 @@ public class ClientOperator
             Client.Connect(ipAddress, port);//增强实时性，使用无延迟发送
             Client.OnConnect += OnConncet;
             Client.RootDirectoryPath = @"d:\temp";
-            Client.OnReceiveMessage += appHandler_OnReceivedMsg;//接收到消息后处理事件
+            Client.OnMessage += appHandler_OnReceivedMsg;//接收到消息后处理事件
             Client.ReceiveAsync();
         }
         catch (Exception ex)
@@ -60,19 +60,20 @@ public class ClientOperator
             //ClientFullHandlerSocket_MSG.logger.Info("Connect failed");
             return;
         }
-        //login
-        if (Client.Login("admin", "password"))
-        {
-            new Task(() => OnUpdateMessage?.Invoke($"{Name}: login")).Start();
-            //button_connect.Text = "Connected";
-            //button_connect.Enabled = false;
-            //ClientFullHandlerSocket_MSG.logger.Info("Login success");
-        }
-        else
-        {
-            //MessageBox.Show("Login failed");
-            //ClientFullHandlerSocket_MSG.logger.Info("Login failed");
-        }
+        Client.Login("admin", "password");
+        ////login
+        //if ()
+        //{
+        //    //new Task(() => OnUpdateMessage?.Invoke($"{Name}: login")).Start();
+        //    //button_connect.Text = "Connected";
+        //    //button_connect.Enabled = false;
+        //    //ClientFullHandlerSocket_MSG.logger.Info("Login success");
+        //}
+        //else
+        //{
+        //    //MessageBox.Show("Login failed");
+        //    //ClientFullHandlerSocket_MSG.logger.Info("Login failed");
+        //}
     }
 
     public void Disconnet()

@@ -5,17 +5,19 @@ using System.Text.RegularExpressions;
 
 namespace Net;
 
+public delegate void HandleMessage(string message);
+
 public partial class ClientProtocol
 {
-    public delegate void HandleMessage(string message);
-
-    public event HandleMessage? OnReceiveMessage;
+    public event HandleMessage? OnMessage;
 
     public event HandleEvent? OnConnect;
 
     public event HandleEvent? OnUploaded;
 
     public event HandleEvent? OnDownloaded;
+
+    EndPoint? RemoteEndPoint { get; set; } = null;
 
     object ConnectLocker { get; } = new();
 
@@ -31,7 +33,13 @@ public partial class ClientProtocol
         {
             ipAddress = IPAddress.Parse(host);
         }
-        Connect(new IPEndPoint(ipAddress, port));
+        RemoteEndPoint = new IPEndPoint(ipAddress, port);
+        Connect(RemoteEndPoint);
+    }
+
+    private void Connect()
+    {
+        Connect(RemoteEndPoint);
     }
 
     private void Connect(EndPoint? remoteEndPoint)
@@ -66,6 +74,7 @@ public partial class ClientProtocol
             Socket?.Dispose();
             return;
         }
+        ReceiveAsync();
         new Task(() => OnConnect?.Invoke(this)).Start();
         SocketInfo.Connect(connectArgs.ConnectSocket);
     }
@@ -82,27 +91,9 @@ public partial class ClientProtocol
         }
     }
 
-    public bool Active()
+    public void HandleMessage(string message)
     {
-        try
-        {
-            var commandComposer = new CommandComposer()
-                .AppendCommand(ProtocolKey.Active);
-            SendCommand(commandComposer);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            //记录日志
-            //ErrorString = ex.Message;
-            //Logger.Error(ex.Message);
-            return false;
-        }
-    }
-
-    public void HandleReceiveMessage(string message)
-    {
-        new Task(() => OnReceiveMessage?.Invoke(message)).Start();
+        new Task(() => OnMessage?.Invoke(message)).Start();
     }
 
     public void HandleDownload()

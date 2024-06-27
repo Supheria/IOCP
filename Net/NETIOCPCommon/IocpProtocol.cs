@@ -34,7 +34,7 @@ public abstract class IocpProtocol : IDisposable
 
     protected bool IsLogin { get; set; } = false;
 
-    public UserInfo UserInfo { get; } = new();
+    public UserInfo? UserInfo { get; protected set; } = new();
 
     object CloseLocker { get; } = new();
 
@@ -43,6 +43,10 @@ public abstract class IocpProtocol : IDisposable
     public void Close() => Dispose();
 
     public event HandleException? OnException;
+
+    protected Dictionary<string, AutoDisposeFileStream> FileReaders { get; } = [];
+
+    protected Dictionary<string, AutoDisposeFileStream> FileWriters { get; } = [];
 
     public void HandleException(Exception exception)
     {
@@ -124,11 +128,9 @@ public abstract class IocpProtocol : IDisposable
             ReceiveBuffer.Clear(packetLength);
         }
     RECEIVE:
-        receiveArgs.Dispose();
         ReceiveAsync();
         return;
     CLOSE:
-        receiveArgs.Dispose();
         Close();
         return;
     }
@@ -151,7 +153,6 @@ public abstract class IocpProtocol : IDisposable
         SocketInfo.Active();
         if (sendArgs.SocketError is not SocketError.Success)
         {
-            sendArgs.Dispose();
             Close();
             return;
         }
@@ -163,15 +164,6 @@ public abstract class IocpProtocol : IDisposable
             IsSendingAsync = true;
             SendAsync(SendBuffer.DynamicBufferManager.Buffer, offset, count);
         }
-        else
-            SendCallback();
-        sendArgs.Dispose();
-    }
-
-    // TODO: refine and remove this
-    protected virtual void SendCallback()
-    {
-
     }
 
     public void SendCommand(CommandComposer commandComposer)

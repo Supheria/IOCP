@@ -41,47 +41,4 @@ public partial class ServerProtocol(IocpServer server)
         BitConverter.GetBytes(keepAliveInterval).CopyTo(buffer, 8);
         return buffer;
     }
-
-    /// <summary>
-    /// 发送回调函数，用于连续下发数据
-    /// </summary>
-    /// <returns></returns>
-    protected override void SendCallback()
-    {
-        if (FileStream is null)
-            return;
-        if (IsSendingFile) // 发送文件头
-        {
-            var commandComposer = new CommandComposer()
-                .AppendCommand(ProtocolKey.SendFile)
-                .AppendValue(ProtocolKey.FileLength, FileStream.Length - FileStream.Position)
-                .AppendSuccess();
-            SendCommand(commandComposer);
-            IsSendingFile = false;
-            return;
-        }
-        if (IsReceivingFile)
-            return;
-        // 没有接收文件时
-        // 发送具体数据,加FileStream.CanSeek是防止上传文件结束后，文件流被释放而出错
-        if (FileStream.CanSeek && FileStream.Position < FileStream.Length)
-        {
-            var commandComposer = new CommandComposer()
-                .AppendCommand(ProtocolKey.Data)
-                .AppendSuccess();
-            ReadBuffer ??= new byte[PacketSize];
-            // 避免多次申请内存
-            if (ReadBuffer.Length < PacketSize)
-                ReadBuffer = new byte[PacketSize];
-            var count = FileStream.Read(ReadBuffer, 0, PacketSize);
-            SendCommand(commandComposer, ReadBuffer, 0, count);
-            return;
-        }
-        // 发送完成
-        //ServerInstance.Logger.Info("End Upload file: " + FilePath);
-        FileStream.Close();
-        FileStream = null;
-        FilePath = "";
-        IsSendingFile = false;
-    }
 }

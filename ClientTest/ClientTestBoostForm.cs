@@ -68,20 +68,21 @@ public class ClientTestBoostForm : ResizeableForm
 
         var ipAddress = IpAddress.Text;
         _ = int.TryParse(Port.Text, out var port);
-        Client.Connect(ipAddress, port);
         Client.OnDownloaded += (IocpProtocol protocol) => UpdateMessage($"文件下载完成");
         Client.OnUploaded += (IocpProtocol protocol) => UpdateMessage($"文件上传完成");
         Client.OnUploading += (string progress) => UpdateMessage($"已上传 {progress}");
         Client.OnDownloading += (string progress) => UpdateMessage($"已下载 {progress}");
+        Client.OnMessage += (string message) => UpdateMessage($"{message}");
         Client.OnException += (ex) => UpdateMessage(ex.Message);
+        Client.Connect(ipAddress, port);
+        Client.Login("admin", "password");
     }
 
     private void DownloadButton_Click(object? sender, EventArgs e)
     {
         //Client.Connect(ipAddress, port);
         //Client.RootDirectoryPath = "download";
-        Client.ReceiveAsync();
-        Client.Login("admin", "password");
+        //Client.ReceiveAsync();
         Client.RootDirectoryPath = "download";
         var uploadedPath = Path.Combine("upload", UploadFilePath);
         var downloadedPath = Path.Combine("download", uploadedPath);
@@ -101,8 +102,7 @@ public class ClientTestBoostForm : ResizeableForm
     {
         //Client.Connect(ipAddress, port);
         //Client.RootDirectoryPath = @"d:\temp";
-        Client.ReceiveAsync();
-        Client.Login("admin", "password");
+        //Client.ReceiveAsync();
         Client.Upload("test", "", new FileInfo("test").Name);
     }
 

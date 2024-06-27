@@ -55,15 +55,14 @@ public class ProtocolKey
     public const string SendFile = "SendFile";
     public const string CyclePacket = "CyclePacket";
 
-    public const string UserID = "UserID";
+    public const string UserId = "UserID";
     public const string UserPermissions = "UserPermissions";
 
     public const string SourcePath = "SourcePath";
     public const string TargetPath = "TargetPath";
     public const string WriteFile = "WriteFile";
     public const string Stamp = "Stamp";
-
-    public const string ParameterError = "ParameterError";
+    public const string CheckConnection = "CheckConnection";
 }
 
 public enum ProtocolCode
@@ -90,4 +89,5 @@ public enum ProtocolCode
     DeleteDirError,
     DeleteFileFailed,
     FileSizeError,
+    NotLogined,
 }
