@@ -1,6 +1,10 @@
 ﻿namespace Net;
 
-internal class ServerProtocolException(string message) : IocpException(message)
+public class ServerProtocolException(ProtocolCode errorCode, string message) : IocpException(errorCode, message)
 {
+    public ServerProtocolException(ProtocolCode errorCode) : this(errorCode, "")
+    {
+
+    }
 
 }

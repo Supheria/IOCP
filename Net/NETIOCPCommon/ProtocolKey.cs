@@ -21,7 +21,7 @@ public class ProtocolKey
     public const string ParentDir = "ParentDir";
     public const string DirName = "DirName";
     public const char TextSeperator = (char)1;
-    public const string FileSize = "FileSize";
+    public const string FileLength = "FileSize";
     public const string PacketSize = "PacketSize";
 
     public const string FileExists = "FileExists";
@@ -57,34 +57,37 @@ public class ProtocolKey
 
     public const string UserID = "UserID";
     public const string UserPermissions = "UserPermissions";
+
+    public const string SourcePath = "SourcePath";
+    public const string TargetPath = "TargetPath";
+    public const string WriteFile = "WriteFile";
+    public const string Stamp = "Stamp";
+
+    public const string ParameterError = "ParameterError";
 }
 
-public class ProtocolCode
+public enum ProtocolCode
 {
-    public const int Success = 0x00000000;
-    public const int NotExistCommand = Success + 0x01;
-    public const int PacketLengthError = Success + 0x02;
-    public const int PacketFormatError = Success + 0x03;
-    public const int UnknowError = Success + 0x04;
-    public const int CommandNoCompleted = Success + 0x05;
-    public const int ParameterError = Success + 0x06;
-    public const int UserOrPasswordError = Success + 0x07;
-    public const int UserHasLogined = Success + 0x08;
-    public const int FileNotExist = Success + 0x09;
-    public const int NotOpenFile = Success + 0x0A;
-    public const int FileIsInUse = Success + 0x0B;
+    Success,
+    NotExistCommand,
+    PacketLengthError,
+    PacketFormatError,
+    UnknowError,
+    CommandNoCompleted,
+    ParameterError,
+    ParameterInvalid,
+    UserOrPasswordError,
+    UserHasLogined,
+    FileNotExist,
+    NotOpenFile,
+    FileIsInUse,
+    FileIsExpired,
+    NotSameVersion,
+    Disconnection,
 
-    public const int DirNotExist = 0x02000001;
-    public const int CreateDirError = 0x02000002;
-    public const int DeleteDirError = 0x02000003;
-    public const int DeleteFileFailed = 0x02000007;
-    public const int FileSizeError = 0x02000008;
-
-    public static string GetErrorCodeString(int errorCode)
-    {
-        string errorString = null;
-        if (errorCode == NotExistCommand)
-            errorString = "Not Exist Command";
-        return errorString;
-    }
+    DirNotExist,
+    CreateDirError,
+    DeleteDirError,
+    DeleteFileFailed,
+    FileSizeError,
 }

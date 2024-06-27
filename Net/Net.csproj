@@ -22,15 +22,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="log4net">
-      <HintPath>..\_lib\log4net.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="..\_lib\LocalUtilities\LocalUtilities.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="ClientDemo\Client.cs">
-      <SubType>Form</SubType>
-    </Compile>
+    <Reference Include="log4net">
+      <HintPath>..\_lib\log4net.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>

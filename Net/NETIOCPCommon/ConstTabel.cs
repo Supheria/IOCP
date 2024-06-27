@@ -12,7 +12,8 @@ public class ConstTabel
     /// </summary>
     public static int ReceiveBufferSize { get; } = 1024 * 4;
 
-    public static int ReceiveBufferMax { get; } = 10 * 1024 * 1024;
+
+    public static int TransferBufferMax { get; } = 1024 * 1024;
 
     /// <summary>
     /// Socket超时设置为60秒

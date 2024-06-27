@@ -54,7 +54,7 @@ public partial class ServerProtocol(IocpServer server)
         {
             var commandComposer = new CommandComposer()
                 .AppendCommand(ProtocolKey.SendFile)
-                .AppendValue(ProtocolKey.FileSize, FileStream.Length - FileStream.Position)
+                .AppendValue(ProtocolKey.FileLength, FileStream.Length - FileStream.Position)
                 .AppendSuccess();
             SendCommand(commandComposer);
             IsSendingFile = false;

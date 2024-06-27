@@ -69,8 +69,9 @@ public class ClientTestBoostForm : ResizeableForm
         var ipAddress = IpAddress.Text;
         _ = int.TryParse(Port.Text, out var port);
         Client.Connect(ipAddress, port);
-        Client.OnDownload += (IocpProtocol protocol) => UpdateMessage($"文件下载完成");
-        Client.OnUpload += (IocpProtocol protocol) => UpdateMessage($"文件上传完成");
+        Client.OnDownloaded += (IocpProtocol protocol) => UpdateMessage($"文件下载完成");
+        Client.OnUploaded += (IocpProtocol protocol) => UpdateMessage($"文件上传完成");
+        Client.OnUploading += (string progress) => UpdateMessage($"已上传 {progress}%");
     }
 
     private void DownloadButton_Click(object? sender, EventArgs e)
@@ -100,7 +101,7 @@ public class ClientTestBoostForm : ResizeableForm
         //Client.RootDirectoryPath = @"d:\temp";
         Client.ReceiveAsync();
         Client.Login("admin", "password");
-        Client.Upload(UploadFilePath, "", new FileInfo(UploadFilePath).Name);
+        Client.Upload("test", "", new FileInfo("test").Name);
     }
 
     private void SingleButton_Click(object? sender, EventArgs e)
@@ -223,6 +224,6 @@ public class ClientTestBoostForm : ResizeableForm
         MessageBox.Left = ClientLeft + Padding;
         MessageBox.Top = DownloadButton.Bottom + Padding;
         MessageBox.Width = ClientWidth - Padding * 2;
-        MessageBox.Height = ClientHeight - SwitchButton.Height * 2 - Padding * 3;
+        MessageBox.Height = ClientHeight - SwitchButton.Height * 2 - Padding * 4;
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -95,30 +96,31 @@ public abstract class IocpProtocol : IDisposable
             if (UseNetByteOrder)
                 packetLength = IPAddress.NetworkToHostOrder(packetLength);
             // 最大Buffer异常保护
-            if (packetLength > ConstTabel.ReceiveBufferMax || ReceiveBuffer.DataCount > ConstTabel.ReceiveBufferMax)
+            // buffer = [totol legth] + [command length] + [command] + [data]
+            var offset = sizeof(int); // totol length
+            var commandLength = BitConverter.ToInt32(ReceiveBuffer.Buffer, offset); //取出命令长度
+            offset += sizeof(int); // command length
+            var bufferMax = ConstTabel.TransferBufferMax + commandLength + offset;
+            if (packetLength > bufferMax || ReceiveBuffer.DataCount > bufferMax)
                 goto CLOSE;
             // 收到的数据没有达到包长度，继续接收
             if (ReceiveBuffer.DataCount < packetLength)
                 goto RECEIVE;
-            HandlePacket(ReceiveBuffer.Buffer, sizeof(int), packetLength);
+            var command = Encoding.UTF8.GetString(ReceiveBuffer.Buffer, offset, commandLength);
+            var commandParser = CommandParser.Parse(command);
+            offset += commandLength;
+            // 处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - length，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
+            ProcessCommand(commandParser, ReceiveBuffer.Buffer, offset, packetLength - offset);
             ReceiveBuffer.Clear(packetLength);
         }
     RECEIVE:
+        receiveArgs.Dispose();
         ReceiveAsync();
         return;
     CLOSE:
+        receiveArgs.Dispose();
         Close();
         return;
-    }
-
-    private void HandlePacket(byte[] buffer, int offset, int count)
-    {
-        if (count < sizeof(int))
-            return;
-        var commandLength = BitConverter.ToInt32(buffer, offset); //取出命令长度
-        var command = Encoding.UTF8.GetString(buffer, offset + sizeof(int), commandLength);
-        var commandParser = CommandParser.Parse(command);
-        ProcessCommand(commandParser, buffer, offset + sizeof(int) + commandLength, count - sizeof(int) - sizeof(int) - commandLength); //处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - length，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
     }
 
     protected abstract void ProcessCommand(CommandParser commandParser, byte[] buffer, int offset, int count);
@@ -139,6 +141,7 @@ public abstract class IocpProtocol : IDisposable
         SocketInfo.Active();
         if (sendArgs.SocketError is not SocketError.Success)
         {
+            sendArgs.Dispose();
             Close();
             return;
         }
@@ -152,6 +155,7 @@ public abstract class IocpProtocol : IDisposable
         }
         else
             SendCallback();
+        sendArgs.Dispose();
     }
 
     // TODO: refine and remove this

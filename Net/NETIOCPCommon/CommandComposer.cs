@@ -4,7 +4,7 @@ namespace Net;
 
 public class CommandComposer
 {
-    List<string> Commands { get; } = [];
+    StringBuilder Commands { get; } = new();
 
     public void Clear()
     {
@@ -13,10 +13,7 @@ public class CommandComposer
 
     public string GetCommand()
     {
-        var str = new StringBuilder();
-        if (Commands.Count > 0)
-            str.AppendJoin(ProtocolKey.ReturnWrap, Commands);
-        return str.ToString();
+        return Commands.ToString();
     }
 
     public CommandComposer AppendCommand(string commandKey)
@@ -26,7 +23,8 @@ public class CommandComposer
             .Append(ProtocolKey.EqualSign)
             .Append(commandKey)
             .ToString();
-        Commands.Add(str);
+        Commands.Append(str)
+            .Append(ProtocolKey.ReturnWrap);
         return this;
     }
 
@@ -37,7 +35,8 @@ public class CommandComposer
             .Append(ProtocolKey.EqualSign)
             .Append(ProtocolCode.Success)
             .ToString();
-        Commands.Add(str);
+        Commands.Append(str)
+            .Append(ProtocolKey.ReturnWrap);
         return this;
     }
 
@@ -48,13 +47,15 @@ public class CommandComposer
             .Append(ProtocolKey.EqualSign)
             .Append(errorCode)
             .ToString();
-        Commands.Add(str);
+        Commands.Append(str)
+            .Append(ProtocolKey.ReturnWrap);
         str = new StringBuilder()
             .Append(ProtocolKey.Message)
             .Append(ProtocolKey.EqualSign)
             .Append(message)
             .ToString();
-        Commands.Add(str);
+        Commands.Append(str)
+            .Append(ProtocolKey.ReturnWrap);
         return this;
     }
 
@@ -65,7 +66,8 @@ public class CommandComposer
             .Append(ProtocolKey.EqualSign)
             .Append(value.ToString())
             .ToString();
-        Commands.Add(str);
+        Commands.Append(str)
+            .Append(ProtocolKey.ReturnWrap);
         return this;
     }
 }

@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿using LocalUtilities.TypeToolKit.Text;
+using System.Text;
+using static Net.ServerProtocol;
 
 namespace Net;
 
@@ -25,6 +27,12 @@ partial class ClientProtocol : IocpProtocol
 
     public AutoResetEvent LoginDone { get; } = new(false);
 
+    public delegate void HandleProgress(string progress);
+
+    public event HandleProgress? OnUploading;
+
+    Dictionary<string, AutoDisposeFileStream> FileReaders { get; } = [];
+
     /// <summary>
     /// 向服务端发送消息，由消息来驱动业务逻辑，接收方必须返回应答，否则认为发送失败
     /// </summary>
@@ -44,7 +52,7 @@ partial class ClientProtocol : IocpProtocol
             if (!ReConnectAndLogin()) // 检测连接是否还在，如果断开则重连并登录
             {
                 //Logger.Error("AsyncClientFullHandlerSocket.SendMessage:" + "Socket disconnect");
-                throw new ClientProtocolException("Server is Stoped"); //抛异常是为了让前台知道网络链路的情况         
+                throw new ClientProtocolException(ProtocolCode.Disconnection, "Server is Stoped"); //抛异常是为了让前台知道网络链路的情况         
             }
             new Task(() => SendMessage(message)).Start();
         }
@@ -73,13 +81,10 @@ partial class ClientProtocol : IocpProtocol
                 DoMessage(buffer, offset, count);
                 return;
             case ProtocolKey.Upload:
-                DoUpload();
+                DoUpload(commandParser);
                 return;
             case ProtocolKey.Download:
                 DoDownload();
-                return;
-            case ProtocolKey.SendFile:
-                DoSendFile(commandParser);
                 return;
             case ProtocolKey.Data:
                 DoData(buffer, offset, count);
@@ -143,25 +148,6 @@ partial class ClientProtocol : IocpProtocol
         catch { }
     }
 
-    private void DoSendFile(CommandParser commandParser)
-    {
-        if (!IsSendingFile)
-        {
-            commandParser.GetValueAsLong(ProtocolKey.FileSize, out var fileSize);
-            FileSize = fileSize;
-            return;
-        }
-        if (FileStream is null || FileStream.Position >= FileStream.Length)
-            return;
-        // 上传文件中
-        // 发送具体数据
-        var commandComposer = new CommandComposer()
-            .AppendCommand(ProtocolKey.Data);
-        ReadBuffer ??= new byte[PacketSize];
-        var count = FileStream.Read(ReadBuffer, 0, PacketSize);
-        SendCommand(commandComposer, ReadBuffer, 0, count);
-    }
-
     private void DoData(byte[] buffer, int offset, int count)
     {
         // 下载文件
@@ -194,7 +180,7 @@ partial class ClientProtocol : IocpProtocol
         {
             IsSendingFile = false;
             PacketSize /= 8;//文件传输时将包大小放大8倍,传输完成后还原为原来大小
-            HandleUpload();
+            HandleUploaded();
             return;
         }
         // 发送具体数据
@@ -206,14 +192,39 @@ partial class ClientProtocol : IocpProtocol
         SendCommand(commandComposer, ReadBuffer, 0, countRemain);
     }
 
-    private void DoUpload()
+    private void DoUpload(CommandParser commandParser)
     {
-        if (FileStream is null || !IsSendingFile)
-            return;
-        var commandComposer = new CommandComposer()
-            .AppendCommand(ProtocolKey.SendFile);
-        //CommandComposer.AddValue(ProtocolKey.FileSize, FileStream.Length);
-        SendCommand(commandComposer);
+        try
+        {
+            if (!commandParser.GetValueAsString(ProtocolKey.Stamp, out var stamp) ||
+                !commandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize))
+                throw new ClientProtocolException(ProtocolCode.ParameterError);
+            if (!FileReaders.TryGetValue(stamp, out var autoFile))
+                throw new ClientProtocolException(ProtocolCode.ParameterInvalid, "invalid file stamp");
+            if (autoFile.Position >= autoFile.Length)
+            {
+                // TODO: log success
+                autoFile.Close();
+                HandleUploaded();
+                return;
+            }
+            new Task(() => OnUploading?.Invoke($"{autoFile.Position * 100f / autoFile.Length}%")).Start();
+            var buffer = new byte[packetSize];
+            if (!autoFile.Read(buffer, 0, buffer.Length, out var count))
+                throw new ClientProtocolException(ProtocolCode.FileIsExpired);
+            //autoFile.Position += count;
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.WriteFile)
+                .AppendValue(ProtocolKey.FileLength, autoFile.Length)
+                .AppendValue(ProtocolKey.Stamp, stamp)
+                .AppendValue(ProtocolKey.PacketSize, packetSize)
+                .AppendValue(ProtocolKey.Position, autoFile.Position);
+            SendCommand(commandComposer, buffer, 0, count);
+        }
+        catch (Exception ex)
+        {
+            // TODO: log fail
+        }
     }
 
     public bool Login(string userID, string password)
@@ -269,25 +280,28 @@ partial class ClientProtocol : IocpProtocol
         }
         try
         {
-            long fileSize = 0;
-            if (File.Exists(fileFullPath))
-            {
-                FileStream = new FileStream(fileFullPath, FileMode.Open, FileAccess.Read, FileShare.Read);//文件以共享只读方式打开
-                fileSize = FileStream.Length;
-                IsSendingFile = true;
-                PacketSize *= 8;//文件传输时设置包大小为原来的8倍，提高传输效率，传输完成后复原
-            }
-            else
+            //long fileSize = 0;
+            if (!File.Exists(fileFullPath))
             {
                 //Logger.Error("Start Upload file error, file is not exists: " + fileFullPath);
                 return;
             }
+            //FileStream = new FileStream(fileFullPath, FileMode.Open, FileAccess.Read, FileShare.Read);//文件以共享只读方式打开
+            //fileSize = FileStream.Length;
+            //IsSendingFile = true;
+            //PacketSize *= 8;//文件传输时设置包大小为原来的8倍，提高传输效率，传输完成后复原
+            var fileStream = new FileStream(fileFullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var stamp = DateTime.Now.ToString();
+            var autoFile = new AutoDisposeFileStream(stamp, fileStream, 5);
+            autoFile.OnClosed += (file) => FileReaders.Remove(file.TimeStamp);
+            FileReaders[stamp] = autoFile;
+            var packetSize = fileStream.Length > ConstTabel.TransferBufferMax ? ConstTabel.TransferBufferMax : fileStream.Length;
             var commandComposer = new CommandComposer()
                 .AppendCommand(ProtocolKey.Upload)
                 .AppendValue(ProtocolKey.DirName, remoteDir)
                 .AppendValue(ProtocolKey.FileName, remoteName)
-                .AppendValue(ProtocolKey.FileSize, fileSize)
-                .AppendValue(ProtocolKey.PacketSize, PacketSize);
+                .AppendValue(ProtocolKey.Stamp, stamp)
+                .AppendValue(ProtocolKey.PacketSize, packetSize);
             SendCommand(commandComposer);
         }
         catch (Exception e)
@@ -325,7 +339,7 @@ partial class ClientProtocol : IocpProtocol
                 .AppendCommand(ProtocolKey.Download)
                 .AppendValue(ProtocolKey.DirName, dirName)
                 .AppendValue(ProtocolKey.FileName, fileName)
-                .AppendValue(ProtocolKey.FileSize, fileSize)
+                .AppendValue(ProtocolKey.FileLength, fileSize)
                 .AppendValue(ProtocolKey.PacketSize, PacketSize);
             SendCommand(commandComposer);
         }

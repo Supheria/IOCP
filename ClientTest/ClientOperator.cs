@@ -104,7 +104,7 @@ public class ClientOperator
 
     public void UploadFile(string localFilePath)
     {
-        Client.OnUpload += (IocpProtocol protocol) => OnUpdateMessage?.Invoke($"{Name}: 文件上传完成");
+        Client.OnUploaded += (IocpProtocol protocol) => OnUpdateMessage?.Invoke($"{Name}: 文件上传完成");
         Client.Connect("127.0.0.1", 8000);
         Client.RootDirectoryPath = @"d:\temp";
         Client.ReceiveAsync();
@@ -117,7 +117,7 @@ public class ClientOperator
         //if (ClientFullHandlerSocket_MSG == null)
         {
             //Client = new();
-            Client.OnDownload += DownLoadEvent_DownLoadProcess; // 只挂接下载事件
+            Client.OnDownloaded += DownLoadEvent_DownLoadProcess; // 只挂接下载事件
             Client.Connect("127.0.0.1", 8000);
             Client.RootDirectoryPath = "download";
             Client.ReceiveAsync();

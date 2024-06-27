@@ -13,9 +13,9 @@ public partial class ClientProtocol
 
     public event HandleEvent? OnConnect;
 
-    public event HandleEvent? OnUpload;
+    public event HandleEvent? OnUploaded;
 
-    public event HandleEvent? OnDownload;
+    public event HandleEvent? OnDownloaded;
 
     object ConnectLocker { get; } = new();
 
@@ -73,7 +73,7 @@ public partial class ClientProtocol
     public bool CheckErrorCode(CommandParser commandParser)
     {
         commandParser.GetValueAsInt(ProtocolKey.Code, out var errorCode);
-        if (errorCode is ProtocolCode.Success)
+        if ((ProtocolCode)errorCode is ProtocolCode.Success)
             return true;
         else
         {
@@ -107,11 +107,11 @@ public partial class ClientProtocol
 
     public void HandleDownload()
     {
-        new Task(() => OnDownload?.Invoke(this)).Start();
+        new Task(() => OnDownloaded?.Invoke(this)).Start();
     }
 
-    public void HandleUpload()
+    public void HandleUploaded()
     {
-        new Task(() => OnUpload?.Invoke(this)).Start();
+        new Task(() => OnUploaded?.Invoke(this)).Start();
     }
 }
