@@ -186,23 +186,24 @@ public class IocpServer
     /// <returns></returns>
     public bool CheckFileInUse(string filePath)
     {
-        if (isFileInUse())
-        {
-            bool result = true;
-            ProtocolList.CopyTo(out var userTokenss);
-            foreach (var protocol in userTokenss)
-            {
-                if (!filePath.Equals(protocol.FilePath, StringComparison.CurrentCultureIgnoreCase))
-                    continue;
-                lock (protocol) // AsyncSocketUserToken有多个线程访问
-                {
-                    protocol.Close();
-                }
-                result = false;
-            }
-            return result;
-        }
-        return false;
+        //if (isFileInUse())
+        //{
+        //    bool result = true;
+        //    ProtocolList.CopyTo(out var userTokenss);
+        //    foreach (var protocol in userTokenss)
+        //    {
+        //        if (!filePath.Equals(protocol.FilePath, StringComparison.CurrentCultureIgnoreCase))
+        //            continue;
+        //        lock (protocol) // AsyncSocketUserToken有多个线程访问
+        //        {
+        //            protocol.Close();
+        //        }
+        //        result = false;
+        //    }
+        //    return result;
+        //}
+        //return false;
+        return isFileInUse();
         bool isFileInUse()
         {
             try

@@ -1,10 +1,14 @@
 using LocalUtilities.TypeGeneral;
+using Net;
+using static ClientTest.ClientOperator;
 
 namespace ClientTest;
 
 public class ClientTestBoostForm : ResizeableForm
 {
     public override string LocalName => nameof(ClientTestBoostForm);
+
+    ClientProtocol Client { get; } = new();
 
     TextBox IpAddress { get; } = new()
     {
@@ -26,6 +30,16 @@ public class ClientTestBoostForm : ResizeableForm
         Text = "single"
     };
 
+    Button UploadButton { get; } = new()
+    {
+        Text = "upload"
+    };
+
+    Button DownloadButton { get; } = new()
+    {
+        Text = "download"
+    };
+
     RichTextBox MessageBox { get; } = new();
 
     System.Timers.Timer Timer { get; } = new();
@@ -40,12 +54,53 @@ public class ClientTestBoostForm : ResizeableForm
             Port,
             MessageBox,
             SingleButton,
+            UploadButton,
+            DownloadButton,
             ]);
         OnDrawingClient += DrawClient;
         SwitchButton.Click += Start_Click;
         SingleButton.Click += SingleButton_Click;
+        UploadButton.Click += UploadButton_Click;
+        DownloadButton.Click += DownloadButton_Click;
         Timer.Interval = 100;
         Timer.Elapsed += (_, _) => Test();
+
+
+        var ipAddress = IpAddress.Text;
+        _ = int.TryParse(Port.Text, out var port);
+        Client.Connect(ipAddress, port);
+        Client.OnDownload += (IocpProtocol protocol) => UpdateMessage($"文件下载完成");
+        Client.OnUpload += (IocpProtocol protocol) => UpdateMessage($"文件上传完成");
+    }
+
+    private void DownloadButton_Click(object? sender, EventArgs e)
+    {
+        //Client.Connect(ipAddress, port);
+        //Client.RootDirectoryPath = "download";
+        Client.ReceiveAsync();
+        Client.Login("admin", "password");
+        Client.RootDirectoryPath = "download";
+        var uploadedPath = Path.Combine("upload", UploadFilePath);
+        var downloadedPath = Path.Combine("download", uploadedPath);
+        if (File.Exists(downloadedPath))
+        {
+            try
+            {
+                File.Delete(downloadedPath);
+            }
+            catch { }
+        }
+        FileInfo fi = new FileInfo(uploadedPath);
+        Client.Download(fi.DirectoryName, fi.Name, fi.DirectoryName.Substring(fi.DirectoryName.LastIndexOf("\\", StringComparison.Ordinal)));
+    }
+
+    private void UploadButton_Click(object? sender, EventArgs e)
+    {
+        //Client.Connect(ipAddress, port);
+        //Client.RootDirectoryPath = @"d:\temp";
+        Client.ReceiveAsync();
+        Client.Login("admin", "password");
+        Client.Upload(UploadFilePath, "", new FileInfo(UploadFilePath).Name);
     }
 
     private void SingleButton_Click(object? sender, EventArgs e)
@@ -136,7 +191,7 @@ public class ClientTestBoostForm : ResizeableForm
 
     private void DrawClient()
     {
-        var width = ClientWidth / 9;
+        var width = ClientWidth / 5;
         var top = ClientTop + Padding;
         //
         IpAddress.Left = ClientLeft + width;
@@ -147,7 +202,9 @@ public class ClientTestBoostForm : ResizeableForm
         Port.Top = top;
         Port.Width = width;
         //
-        SingleButton.Left = Port.Right + width;
+        width = ClientWidth / 9;
+        top = Port.Bottom + Padding;
+        SingleButton.Left = ClientLeft + width;
         SingleButton.Top = top;
         SingleButton.Width = width;
         //
@@ -155,9 +212,17 @@ public class ClientTestBoostForm : ResizeableForm
         SwitchButton.Top = top;
         SwitchButton.Width = width;
         //
+        UploadButton.Left = SwitchButton.Right + width;
+        UploadButton.Top = top;
+        UploadButton.Width = width;
+        //
+        DownloadButton.Left = UploadButton.Right + width;
+        DownloadButton.Top = top;
+        DownloadButton.Width = width;
+        //
         MessageBox.Left = ClientLeft + Padding;
-        MessageBox.Top = SwitchButton.Bottom + Padding;
+        MessageBox.Top = DownloadButton.Bottom + Padding;
         MessageBox.Width = ClientWidth - Padding * 2;
-        MessageBox.Height = ClientHeight - SwitchButton.Height - Padding * 3;
+        MessageBox.Height = ClientHeight - SwitchButton.Height * 2 - Padding * 3;
     }
 }

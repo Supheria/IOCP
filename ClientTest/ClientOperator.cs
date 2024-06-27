@@ -104,15 +104,11 @@ public class ClientOperator
 
     public void UploadFile(string localFilePath)
     {
-        //if (ClientFullHandlerSocket_MSG == null)
-        {
-            //Client = new();
-            Client.OnUpload += UploadEvent_UploadProcess; // 只挂接上传事件
-            Client.Connect("127.0.0.1", 8000);
-            Client.RootDirectoryPath = @"d:\temp";
-            Client.ReceiveAsync();
-            Client.Login("admin", "password");
-        }
+        Client.OnUpload += (IocpProtocol protocol) => OnUpdateMessage?.Invoke($"{Name}: 文件上传完成");
+        Client.Connect("127.0.0.1", 8000);
+        Client.RootDirectoryPath = @"d:\temp";
+        Client.ReceiveAsync();
+        Client.Login("admin", "password");
         Client.Upload(localFilePath, "", new FileInfo(localFilePath).Name);
     }
 

@@ -159,7 +159,7 @@ partial class ServerProtocol : IocpProtocol
             return;
         }
         // TODO: modified here for uniform
-        dir = dir is "" ? RootDirectoryPath : RootDirectoryPath;
+        dir = dir is "" ? RootDirectoryPath : dir;
         if (!Directory.Exists(dir))
         {
             CommandFail(ProtocolCode.DirNotExist, dir);
