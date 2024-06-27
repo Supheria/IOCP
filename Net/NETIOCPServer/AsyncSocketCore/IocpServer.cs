@@ -60,6 +60,7 @@ public class IocpServer
                 OnClientNumberChange?.Invoke(ClientState.Disconnect, protocol);
                 OnParallelRemainChange?.Invoke(ProtocolPool.Count);
             };
+            protocol.OnException += (ex) => OnReceiveMessage?.Invoke(ex.Message, protocol);
             ProtocolPool.Push(protocol);
         }
         TimeoutMilliseconds = timeoutMilliseconds;

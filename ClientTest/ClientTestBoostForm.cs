@@ -71,7 +71,9 @@ public class ClientTestBoostForm : ResizeableForm
         Client.Connect(ipAddress, port);
         Client.OnDownloaded += (IocpProtocol protocol) => UpdateMessage($"文件下载完成");
         Client.OnUploaded += (IocpProtocol protocol) => UpdateMessage($"文件上传完成");
-        Client.OnUploading += (string progress) => UpdateMessage($"已上传 {progress}%");
+        Client.OnUploading += (string progress) => UpdateMessage($"已上传 {progress}");
+        Client.OnDownloading += (string progress) => UpdateMessage($"已下载 {progress}");
+        Client.OnException += (ex) => UpdateMessage(ex.Message);
     }
 
     private void DownloadButton_Click(object? sender, EventArgs e)

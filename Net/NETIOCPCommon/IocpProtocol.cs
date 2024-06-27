@@ -6,6 +6,8 @@ using System.Text;
 
 namespace Net;
 
+public delegate void HandleException(Exception exception);
+
 public abstract class IocpProtocol : IDisposable
 {
     public delegate void HandleEvent(IocpProtocol protocol);
@@ -39,6 +41,14 @@ public abstract class IocpProtocol : IDisposable
     public event HandleEvent? OnClosed;
 
     public void Close() => Dispose();
+
+    public event HandleException? OnException;
+
+    public void HandleException(Exception exception)
+    {
+        //OnException?.Invoke(exception);
+        new Task(() => OnException?.Invoke(exception)).Start();
+    }
 
     public void Dispose()
     {

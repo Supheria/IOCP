@@ -19,4 +19,6 @@ public class ConstTabel
     /// Socket超时设置为60秒
     /// </summary>
     public static int TimeoutMilliseconds { get; } = 60 * 1000;
+
+    public static int FileStreamExpireSeconds { get; } = 5;
 }

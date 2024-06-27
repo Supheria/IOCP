@@ -88,6 +88,8 @@ internal class ServerForm : ResizeableForm
             protocol.SendMessage("result0123456789.9876543210");
             //protocol.SendAsync("result0123456789.9876543210");
         }
+        else
+            UpdateMessage($"{protocol.SocketInfo.RemoteEndPoint}: {message}");
     }
 
     private void Server_OnClientNumberChange(IocpServer.ClientState state, ServerProtocol protocol)

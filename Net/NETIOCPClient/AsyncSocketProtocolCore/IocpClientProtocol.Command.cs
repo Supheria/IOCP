@@ -1,4 +1,5 @@
 ﻿using LocalUtilities.TypeToolKit.Text;
+using System.IO;
 using System.Text;
 using static Net.ServerProtocol;
 
@@ -31,7 +32,11 @@ partial class ClientProtocol : IocpProtocol
 
     public event HandleProgress? OnUploading;
 
+    public event HandleProgress? OnDownloading;
+
     Dictionary<string, AutoDisposeFileStream> FileReaders { get; } = [];
+
+    Dictionary<string, AutoDisposeFileStream> FileWriters { get; } = [];
 
     /// <summary>
     /// 向服务端发送消息，由消息来驱动业务逻辑，接收方必须返回应答，否则认为发送失败
@@ -84,7 +89,7 @@ partial class ClientProtocol : IocpProtocol
                 DoUpload(commandParser);
                 return;
             case ProtocolKey.Download:
-                DoDownload();
+                DoDownload(commandParser, buffer, offset, count);
                 return;
             case ProtocolKey.Data:
                 DoData(buffer, offset, count);
@@ -132,20 +137,38 @@ partial class ClientProtocol : IocpProtocol
         LoginDone.Set();//登录结束
     }
 
-    private void DoDownload()
+    private void DoDownload(CommandParser commandParser, byte[] buffer, int offset, int count)
     {
-        if (File.Exists(FilePath))
-            return;
-        // 本地不存在，则创建
-        // TODO: modify this strange
-        var dir = FilePath.Substring(0, FilePath.LastIndexOf("\\"));
-        if (!Directory.Exists(dir))
-            Directory.CreateDirectory(dir);
         try
         {
-            FileStream = new FileStream(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            if (!commandParser.GetValueAsLong(ProtocolKey.FileLength, out var fileLength) ||
+                !commandParser.GetValueAsString(ProtocolKey.Stamp, out var stamp) ||
+                !commandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize) ||
+                !commandParser.GetValueAsLong(ProtocolKey.Position, out var position))
+                throw new ServerProtocolException(ProtocolCode.ParameterError);
+            if (!FileWriters.TryGetValue(stamp, out var autoFile))
+                throw new ClientProtocolException(ProtocolCode.ParameterInvalid, "invalid file stamp");
+            autoFile.Write(buffer, offset, count);
+            new Task(() => OnDownloading?.Invoke($"{autoFile.Position * 100f / fileLength}%")).Start();
+            // simple validation
+            if (autoFile.Position != position)
+                throw new ClientProtocolException(ProtocolCode.NotSameVersion);
+            if (autoFile.Length >= fileLength)
+            {
+                autoFile.Close();
+                HandleDownload();
+            }
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.SendFile)
+                .AppendValue(ProtocolKey.Stamp, stamp)
+                .AppendValue(ProtocolKey.PacketSize, packetSize);
+            SendCommand(commandComposer);
         }
-        catch { }
+        catch(Exception ex)
+        {
+            HandleException(ex);
+            // TODO: log fail
+        }
     }
 
     private void DoData(byte[] buffer, int offset, int count)
@@ -223,6 +246,7 @@ partial class ClientProtocol : IocpProtocol
         }
         catch (Exception ex)
         {
+            HandleException(ex);
             // TODO: log fail
         }
     }
@@ -241,8 +265,9 @@ partial class ClientProtocol : IocpProtocol
             LoginDone.WaitOne();//登录阻塞，强制同步
             return IsLogin;
         }
-        catch (Exception E)
+        catch (Exception ex)
         {
+            HandleException(ex);
             //记录日志
             //Logger.Error("AsyncClientFullHandlerSocket.DoLogin" + "userID:" + userID + " password:" + password + " " + E.Message);
             return false;
@@ -264,14 +289,15 @@ partial class ClientProtocol : IocpProtocol
             ReceiveAsync();
             return Login(UserInfo.Id, UserInfo.Password);
         }
-        catch (Exception E)
+        catch (Exception ex)
         {
+            HandleException(ex);
             //Logger.Error("AsyncClientFullHandlerSocket.ReConnectAndLogin" + "userID:" + UserID + " password:" + Password + " " + E.Message);
             return false;
         }
     }
 
-    public void Upload(string fileFullPath, string remoteDir, string remoteName)
+    public void Upload(string filePath, string remoteDir, string remoteName)
     {
         if (!ReConnectAndLogin())
         {
@@ -281,18 +307,14 @@ partial class ClientProtocol : IocpProtocol
         try
         {
             //long fileSize = 0;
-            if (!File.Exists(fileFullPath))
+            if (!File.Exists(filePath))
             {
                 //Logger.Error("Start Upload file error, file is not exists: " + fileFullPath);
-                return;
+                throw new ClientProtocolException(ProtocolCode.FileNotExist, filePath);
             }
-            //FileStream = new FileStream(fileFullPath, FileMode.Open, FileAccess.Read, FileShare.Read);//文件以共享只读方式打开
-            //fileSize = FileStream.Length;
-            //IsSendingFile = true;
-            //PacketSize *= 8;//文件传输时设置包大小为原来的8倍，提高传输效率，传输完成后复原
-            var fileStream = new FileStream(fileFullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             var stamp = DateTime.Now.ToString();
-            var autoFile = new AutoDisposeFileStream(stamp, fileStream, 5);
+            var autoFile = new AutoDisposeFileStream(stamp, fileStream, ConstTabel.FileStreamExpireSeconds);
             autoFile.OnClosed += (file) => FileReaders.Remove(file.TimeStamp);
             FileReaders[stamp] = autoFile;
             var packetSize = fileStream.Length > ConstTabel.TransferBufferMax ? ConstTabel.TransferBufferMax : fileStream.Length;
@@ -304,8 +326,9 @@ partial class ClientProtocol : IocpProtocol
                 .AppendValue(ProtocolKey.PacketSize, packetSize);
             SendCommand(commandComposer);
         }
-        catch (Exception e)
+        catch (Exception ex)
         {
+            HandleException(ex);
             //记录日志
             //Logger.Error(e.Message);
         }
@@ -320,31 +343,31 @@ partial class ClientProtocol : IocpProtocol
         }
         try
         {
-            long fileSize = 0;
-            FilePath = Path.Combine(RootDirectoryPath + pathLastLevel, fileName);
-            if (File.Exists(FilePath))//支持断点续传，如果有未下载完成的，则接着下载
+            var filePath = Path.Combine(RootDirectoryPath + pathLastLevel, fileName);
+            if (File.Exists(filePath))
             {
-                if (!BasicFunc.IsFileInUse(FilePath)) //检测文件是否正在使用中
-                {
-                    FileStream = new FileStream(FilePath, FileMode.Open, FileAccess.ReadWrite);
-                }
-                else
-                {
-                    //Logger.Error("Start download file error, file is in use: " + fileName);
-                    return;
-                }
-                fileSize = FileStream.Length;
+                //Logger.Error("Start Upload file error, file is not exists: " + fileFullPath);
+                File.Delete(filePath);
             }
+            if (!Directory.Exists(dirName))
+                Directory.CreateDirectory(dirName);
+            //long fileSize = 0;
+            //FilePath = Path.Combine(RootDirectoryPath + pathLastLevel, fileName);
+            var fileStream = new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
+            var stamp = DateTime.Now.ToString();
+            var autoFile = new AutoDisposeFileStream(stamp, fileStream, ConstTabel.FileStreamExpireSeconds);
+            autoFile.OnClosed += (file) => FileWriters.Remove(file.TimeStamp);
+            FileWriters[stamp] = autoFile;
             var commandComposer = new CommandComposer()
                 .AppendCommand(ProtocolKey.Download)
                 .AppendValue(ProtocolKey.DirName, dirName)
                 .AppendValue(ProtocolKey.FileName, fileName)
-                .AppendValue(ProtocolKey.FileLength, fileSize)
-                .AppendValue(ProtocolKey.PacketSize, PacketSize);
+                .AppendValue(ProtocolKey.Stamp, stamp);
             SendCommand(commandComposer);
         }
-        catch (Exception E)
+        catch (Exception ex)
         {
+            HandleException(ex);
             //记录日志
             //Logger.Error(E.Message);
         }

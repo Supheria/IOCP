@@ -26,6 +26,8 @@ partial class ServerProtocol : IocpProtocol
 
     Dictionary<string, AutoDisposeFileStream> FileWriters { get; } = [];
 
+    Dictionary<string, AutoDisposeFileStream> FileReaders { get; } = [];
+
     /// <summary>
     /// 发送消息到客户端，由消息来驱动业务逻辑，接收方必须返回应答，否则认为发送不成功
     /// </summary>
@@ -69,14 +71,17 @@ partial class ServerProtocol : IocpProtocol
             case ProtocolKey.Upload:
                 DoUpload(commandParser);
                 return;
+            case ProtocolKey.WriteFile:
+                DoWriteFile(commandParser, buffer, offset, count);
+                return;
             case ProtocolKey.Download:
                 DoDownload(commandParser);
                 return;
+            case ProtocolKey.SendFile:
+                DoSendFile(commandParser);
+                return;
             case ProtocolKey.Data:
                 DoData(buffer, offset, count);
-                return;
-            case ProtocolKey.WriteFile:
-                DoWriteFile(commandParser, buffer, offset, count);
                 return;
             default:
                 return;
@@ -161,8 +166,8 @@ partial class ServerProtocol : IocpProtocol
             if (File.Exists(filePath))
                 // TODO: make this rename
                 File.Delete(filePath);
-            var fileStream = new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-            var autoFile = new AutoDisposeFileStream(stamp, fileStream, 10);
+            var fileStream = new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
+            var autoFile = new AutoDisposeFileStream(stamp, fileStream, ConstTabel.FileStreamExpireSeconds);
             autoFile.OnClosed += (file) => FileWriters.Remove(file.TimeStamp);
             FileWriters[autoFile.TimeStamp] = autoFile;
             var commandComposer = new CommandComposer()
@@ -171,16 +176,17 @@ partial class ServerProtocol : IocpProtocol
                 .AppendValue(ProtocolKey.PacketSize, packetSize)
                 .AppendValue(ProtocolKey.Position, 0);
             CommandSucceed(commandComposer);
+            return;
         }
         catch (Exception ex)
         {
-            // TODO: log fail
             if (ex is IocpException iocp)
-                CommandFail(iocp.ErrorCode, ex.Message);
+                CommandFail(iocp.ErrorCode, iocp.Message);
             else
                 CommandFail(ProtocolCode.UnknowError, ex.Message);
+            HandleException(ex);
+            // TODO: log fail
         }
-        
     }
 
     private void DoWriteFile(CommandParser commandParser, byte[] buffer, int offset, int count)
@@ -209,14 +215,16 @@ partial class ServerProtocol : IocpProtocol
                 .AppendValue(ProtocolKey.Stamp, stamp)
                 .AppendValue(ProtocolKey.PacketSize, packetSize);
             CommandSucceed(commandComposer);
+            return;
         }
         catch (Exception ex)
         {
-            // TODO: log fail
             if (ex is IocpException iocp)
-                CommandFail(iocp.ErrorCode, ex.Message);
+                CommandFail(iocp.ErrorCode, iocp.Message);
             else
                 CommandFail(ProtocolCode.UnknowError, ex.Message);
+            HandleException(ex);
+            // TODO: log fail
         }
     }
 
@@ -226,48 +234,78 @@ partial class ServerProtocol : IocpProtocol
     /// <returns></returns>
     public void DoDownload(CommandParser commandParser)
     {
-        if (!commandParser.GetValueAsString(ProtocolKey.DirName, out var dir) ||
-            !commandParser.GetValueAsString(ProtocolKey.FileName, out var filePath) ||
-            !commandParser.GetValueAsLong(ProtocolKey.FileLength, out var fileSize) ||
-            !commandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize))
+        try
         {
-            CommandFail(ProtocolCode.ParameterError, "");
-            return;
+            if (!commandParser.GetValueAsString(ProtocolKey.DirName, out var dir) ||
+                !commandParser.GetValueAsString(ProtocolKey.FileName, out var filePath) ||
+                !commandParser.GetValueAsString(ProtocolKey.Stamp, out var stamp)) 
+                throw new ServerProtocolException(ProtocolCode.ParameterError);
+            dir = dir is "" ? RootDirectoryPath : Path.Combine(RootDirectoryPath, dir);
+            if (!Directory.Exists(dir))
+                throw new ServerProtocolException(ProtocolCode.DirNotExist, dir);
+            filePath = Path.Combine(dir, filePath);
+            var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var autoFile = new AutoDisposeFileStream(stamp, fileStream, ConstTabel.FileStreamExpireSeconds);
+            autoFile.OnClosed += (file) => FileReaders.Remove(file.TimeStamp);
+            FileReaders[stamp] = autoFile;
+            var packetSize = fileStream.Length > ConstTabel.TransferBufferMax ? ConstTabel.TransferBufferMax : fileStream.Length;
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.Download)
+                .AppendValue(ProtocolKey.FileLength, fileStream.Length)
+                .AppendValue(ProtocolKey.Stamp, stamp)
+                .AppendValue(ProtocolKey.PacketSize, packetSize)
+                .AppendValue(ProtocolKey.Position, 0);
+            CommandSucceed(commandComposer);
+
         }
-        dir = dir is "" ? RootDirectoryPath : Path.Combine(RootDirectoryPath, dir);
-        if (!Directory.Exists(dir))
+        catch (Exception ex)
         {
-            CommandFail(ProtocolCode.DirNotExist, dir);
-            return;
+            if (ex is IocpException iocp)
+                CommandFail(iocp.ErrorCode, iocp.Message);
+            else
+                CommandFail(ProtocolCode.UnknowError, ex.Message);
+            HandleException(ex);
+            // TODO: log fail
         }
-        FilePath = Path.Combine(dir, filePath);
-        FileStream?.Close(); // 关闭上次传输的文件
-        FileStream = null;
-        IsSendingFile = false;
-        if (!File.Exists(FilePath))
+    }
+
+    private void DoSendFile(CommandParser commandParser)
+    {
+        try
         {
-            FilePath = "";
-            CommandFail(ProtocolCode.FileNotExist, "");
-            return;
+            if (!commandParser.GetValueAsString(ProtocolKey.Stamp, out var stamp) ||
+                !commandParser.GetValueAsInt(ProtocolKey.PacketSize, out var packetSize))
+                throw new ClientProtocolException(ProtocolCode.ParameterError);
+            if (!FileReaders.TryGetValue(stamp, out var autoFile))
+                throw new ClientProtocolException(ProtocolCode.ParameterInvalid, "invalid file stamp");
+            if (autoFile.Position >= autoFile.Length)
+            {
+                // TODO: log success
+                autoFile.Close();
+                Server.Tip($"文件发送成功，完成时间{DateTime.Now}", this);
+                return;
+            }
+            var buffer = new byte[packetSize];
+            if (!autoFile.Read(buffer, 0, buffer.Length, out var count))
+                throw new ClientProtocolException(ProtocolCode.FileIsExpired);
+            //autoFile.Position += count;
+            var commandComposer = new CommandComposer()
+                .AppendCommand(ProtocolKey.Download)
+                .AppendValue(ProtocolKey.FileLength, autoFile.Length)
+                .AppendValue(ProtocolKey.Stamp, stamp)
+                .AppendValue(ProtocolKey.PacketSize, packetSize)
+                .AppendValue(ProtocolKey.Position, autoFile.Position);
+            SendCommand(commandComposer, buffer, 0, count);
         }
-        if (Server.CheckFileInUse(FilePath))
+        catch (Exception ex)
         {
-            FilePath = "";
-            //ServerInstance.Logger.Error("Start download file error, file is in use: " + filePath);
-            CommandFail(ProtocolCode.FileIsInUse, "");
-            return;
+            if (ex is IocpException iocp)
+                CommandFail(iocp.ErrorCode, iocp.Message);
+            else
+                CommandFail(ProtocolCode.UnknowError, ex.Message);
+            HandleException(ex);
+            // TODO: log fail
         }
-        // 文件以共享只读方式打开，方便多个客户端下载同一个文件。
-        FileStream = new(FilePath, FileMode.Open, FileAccess.Read, FileShare.Read)
-        {
-            Position = fileSize // 文件移到上次下载位置                        
-        };
-        IsSendingFile = true;
-        PacketSize = packetSize;
-        //ServerInstance.Logger.Info("Start download file: " + filePath);
-        var commandComposer = new CommandComposer()
-            .AppendCommand(ProtocolKey.Download);
-        CommandSucceed(commandComposer);
     }
 
     private void DoMessage(byte[] buffer, int offset, int count)
