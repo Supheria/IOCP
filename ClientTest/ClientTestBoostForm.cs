@@ -10,19 +10,19 @@ public class ClientTestBoostForm : ResizeableForm
 
     ClientProtocol Client { get; } = new();
 
-    TextBox IpAddress { get; } = new()
+    TextBox IpAddressBox { get; } = new()
     {
         Text = "127.0.0.1",
     };
 
-    TextBox Port { get; } = new()
+    TextBox PortBox { get; } = new()
     {
         Text = 8000.ToString(),
     };
 
-    Button SwitchButton { get; } = new()
+    Button LoginButton { get; } = new()
     {
-        Text = "start"
+        Text = "login"
     };
 
     Button SingleButton { get; } = new()
@@ -49,16 +49,16 @@ public class ClientTestBoostForm : ResizeableForm
     protected override void InitializeComponent()
     {
         Controls.AddRange([
-            SwitchButton,
-            IpAddress,
-            Port,
+            LoginButton,
+            IpAddressBox,
+            PortBox,
             MessageBox,
             SingleButton,
             UploadButton,
             DownloadButton,
             ]);
         OnDrawingClient += DrawClient;
-        SwitchButton.Click += Start_Click;
+        LoginButton.Click += Login;
         SingleButton.Click += SingleButton_Click;
         UploadButton.Click += UploadButton_Click;
         DownloadButton.Click += DownloadButton_Click;
@@ -72,28 +72,37 @@ public class ClientTestBoostForm : ResizeableForm
         Client.OnMessage += (p, m) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: {m}");
         Client.OnException += (p, ex) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: {ex.Message}");
         Client.OnClosed += (p) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: closed");
-        //Client.Connect(ipAddress, port);
+        //Client.Connect(IpAddress, port);
     }
 
     static string TestFilePath => "test";
 
+    string IpAddress => IpAddressBox.Text;
+
+    int Port
+    {
+        get
+        {
+
+            _ = int.TryParse(PortBox.Text, out var port);
+            return port;
+        }
+    }
+
     private void UploadButton_Click(object? sender, EventArgs e)
     {
-
-        var ipAddress = IpAddress.Text;
-        _ = int.TryParse(Port.Text, out var port);
-        Client.Connect(ipAddress, port);
-        Client.Login("admin", "password");
+        //Client.Connect(IpAddress, port);
+        //Client.Login(IpAddress, Port, "admin", "password");
         Client.Upload(Client.UserInfo?.Name ?? "default", TestFilePath, true);
     }
 
     private void DownloadButton_Click(object? sender, EventArgs e)
     {
 
-        var ipAddress = IpAddress.Text;
-        _ = int.TryParse(Port.Text, out var port);
-        Client.Connect(ipAddress, port);
-        Client.Login("admin", "password");
+        var ipAddress = IpAddressBox.Text;
+        _ = int.TryParse(PortBox.Text, out var port);
+        //Client.Connect(ipAddress, port);
+        //Client.Login(IpAddress, Port, "admin", "password");
         Client.Download(Client.UserInfo?.Name ?? "default", TestFilePath, true);
     }
 
@@ -112,71 +121,61 @@ public class ClientTestBoostForm : ResizeableForm
         Test();
     }
 
-    private void Start_Click(object? sender, EventArgs e)
+    private void Login(object? sender, EventArgs e)
     {
-        if (!IsStart)
-        {
-            Timer.Start();
-            SwitchButton.Text = "Stop";
-        }
-        else
-        {
-            Timer.Stop();
-            SwitchButton.Text = "Start";
-        }
-        IsStart = !IsStart;
+        Client.Login(IpAddress, Port, "admin", "password");
     }
 
     private void Test()
     {
-        var ipAddress = IpAddress.Text;
-        _ = int.TryParse(Port.Text, out var port);
-        ClientOperator c1, c2, c3;
-        //
-        c1 = new("c1");
-        c1.OnUpdateMessage += UpdateMessage;
-        c1.Connect(ipAddress, port);
-        //
-        //Thread.Sleep(1000);
-        //
-        c2 = new("c2");
-        c2.OnUpdateMessage += UpdateMessage;
-        c2.Connect(ipAddress, port);
-        //
-        //Thread.Sleep(1000);
-        //
-        c2.Disconnet();
-        c1.Disconnet();
-        c3 = new("c3");
-        c3.OnUpdateMessage += UpdateMessage;
-        //c3.Connect(ipAddress, port);
-        //
-        Thread.Sleep(10);
-        //
-        c2.Connect(ipAddress, port);
-        c1.Connect(ipAddress, port);
-        c1.SendMessage("c1;Hello World;");
-        c1.UploadFile(TestFilePath);
-        //
-        Thread.Sleep(100);
-        //
-        c2.SendMessage("c2;Hello Host;");
-        var uploadedPath = Path.Combine("upload", TestFilePath);
-        var downloadedPath = Path.Combine("download", uploadedPath);
-        if (File.Exists(downloadedPath))
-        {
-            try
-            {
-                File.Delete(downloadedPath);
-            }
-            catch { }
-        }
-        c3.DownloadFile(uploadedPath);
-        //
-        //Thread.Sleep(10000);
-        //c3.SendMessage("file down");
-        //c3.Disconnet();
+        //var IpAddress = IpAddressBox.Text;
+        //_ = int.Parse(PortBox.Text, out var port);
+        //ClientOperator c1, c2, c3;
+        ////
+        //c1 = new("c1");
+        //c1.OnUpdateMessage += UpdateMessage;
+        //c1.Connect(IpAddress, port);
+        ////
+        ////Thread.Sleep(1000);
+        ////
+        //c2 = new("c2");
+        //c2.OnUpdateMessage += UpdateMessage;
+        //c2.Connect(IpAddress, port);
+        ////
+        ////Thread.Sleep(1000);
+        ////
+        //c2.Disconnet();
         //c1.Disconnet();
+        //c3 = new("c3");
+        //c3.OnUpdateMessage += UpdateMessage;
+        ////c3.Connect(IpAddress, port);
+        ////
+        //Thread.Sleep(10);
+        ////
+        //c2.Connect(IpAddress, port);
+        //c1.Connect(IpAddress, port);
+        //c1.SendMessage("c1;Hello World;");
+        //c1.UploadFile(TestFilePath);
+        ////
+        //Thread.Sleep(100);
+        ////
+        //c2.SendMessage("c2;Hello Host;");
+        //var uploadedPath = Path.Combine("upload", TestFilePath);
+        //var downloadedPath = Path.Combine("download", uploadedPath);
+        //if (File.Exists(downloadedPath))
+        //{
+        //    try
+        //    {
+        //        File.Delete(downloadedPath);
+        //    }
+        //    catch { }
+        //}
+        //c3.DownloadFile(uploadedPath);
+        ////
+        ////Thread.Sleep(10000);
+        ////c3.SendMessage("file down");
+        ////c3.Disconnet();
+        ////c1.Disconnet();
     }
 
     string RootDirectory { get; } = Directory.CreateDirectory(nameof(ClientTestBoostForm)).FullName;
@@ -198,25 +197,25 @@ public class ClientTestBoostForm : ResizeableForm
         var width = ClientWidth / 5;
         var top = ClientTop + Padding;
         //
-        IpAddress.Left = ClientLeft + width;
-        IpAddress.Top = top;
-        IpAddress.Width = width;
+        IpAddressBox.Left = ClientLeft + width;
+        IpAddressBox.Top = top;
+        IpAddressBox.Width = width;
         //
-        Port.Left = IpAddress.Right + width;
-        Port.Top = top;
-        Port.Width = width;
+        PortBox.Left = IpAddressBox.Right + width;
+        PortBox.Top = top;
+        PortBox.Width = width;
         //
         width = ClientWidth / 9;
-        top = Port.Bottom + Padding;
+        top = PortBox.Bottom + Padding;
         SingleButton.Left = ClientLeft + width;
         SingleButton.Top = top;
         SingleButton.Width = width;
         //
-        SwitchButton.Left = SingleButton.Right + width;
-        SwitchButton.Top = top;
-        SwitchButton.Width = width;
+        LoginButton.Left = SingleButton.Right + width;
+        LoginButton.Top = top;
+        LoginButton.Width = width;
         //
-        UploadButton.Left = SwitchButton.Right + width;
+        UploadButton.Left = LoginButton.Right + width;
         UploadButton.Top = top;
         UploadButton.Width = width;
         //
@@ -227,6 +226,6 @@ public class ClientTestBoostForm : ResizeableForm
         MessageBox.Left = ClientLeft + Padding;
         MessageBox.Top = DownloadButton.Bottom + Padding;
         MessageBox.Width = ClientWidth - Padding * 2;
-        MessageBox.Height = ClientHeight - SwitchButton.Height * 2 - Padding * 4;
+        MessageBox.Height = ClientHeight - LoginButton.Height * 2 - Padding * 4;
     }
 }
