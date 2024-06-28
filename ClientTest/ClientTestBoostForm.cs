@@ -77,16 +77,6 @@ public class ClientTestBoostForm : ResizeableForm
 
     static string TestFilePath => "test";
 
-    private void DownloadButton_Click(object? sender, EventArgs e)
-    {
-
-        var ipAddress = IpAddress.Text;
-        _ = int.TryParse(Port.Text, out var port);
-        Client.Connect(ipAddress, port);
-        Client.Login("admin", "password");
-        Client.Download(GetDownloadPath(TestFilePath), GetUploadPath(TestFilePath), true);
-    }
-
     private void UploadButton_Click(object? sender, EventArgs e)
     {
 
@@ -94,7 +84,17 @@ public class ClientTestBoostForm : ResizeableForm
         _ = int.TryParse(Port.Text, out var port);
         Client.Connect(ipAddress, port);
         Client.Login("admin", "password");
-        Client.Upload(TestFilePath, GetUploadPath(TestFilePath), true);
+        Client.Upload(Client.UserInfo?.Name ?? "default", TestFilePath, true);
+    }
+
+    private void DownloadButton_Click(object? sender, EventArgs e)
+    {
+
+        var ipAddress = IpAddress.Text;
+        _ = int.TryParse(Port.Text, out var port);
+        Client.Connect(ipAddress, port);
+        Client.Login("admin", "password");
+        Client.Download(Client.UserInfo?.Name ?? "default", TestFilePath, true);
     }
 
     private string GetUploadPath(string localPath)
