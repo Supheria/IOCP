@@ -1,3 +1,4 @@
+using LocalUtilities.FileHelper;
 using LocalUtilities.IocpNet.Protocol;
 using LocalUtilities.TypeGeneral;
 
@@ -74,29 +75,16 @@ public class ClientTestBoostForm : ResizeableForm
         //Client.Connect(ipAddress, port);
     }
 
+    static string TestFilePath => "test";
+
     private void DownloadButton_Click(object? sender, EventArgs e)
     {
 
         var ipAddress = IpAddress.Text;
         _ = int.TryParse(Port.Text, out var port);
-        //Client.Connect(ipAddress, port);
-        //Client.RootDirectoryPath = "download";
-        //Client.ReceiveAsync();
         Client.Connect(ipAddress, port);
         Client.Login("admin", "password");
-        Client.RootDirectoryPath = "download";
-        var uploadedPath = Path.Combine("upload", UploadFilePath);
-        var downloadedPath = Path.Combine("download", uploadedPath);
-        if (File.Exists(downloadedPath))
-        {
-            try
-            {
-                File.Delete(downloadedPath);
-            }
-            catch { }
-        }
-        FileInfo fi = new FileInfo(uploadedPath);
-        Client.Download(fi.DirectoryName, fi.Name, fi.DirectoryName.Substring(fi.DirectoryName.LastIndexOf("\\", StringComparison.Ordinal)));
+        Client.Download(GetDownloadPath(TestFilePath), GetUploadPath(TestFilePath), true);
     }
 
     private void UploadButton_Click(object? sender, EventArgs e)
@@ -104,12 +92,19 @@ public class ClientTestBoostForm : ResizeableForm
 
         var ipAddress = IpAddress.Text;
         _ = int.TryParse(Port.Text, out var port);
-        //Client.Connect(ipAddress, port);
-        //Client.RootDirectoryPath = @"d:\temp";
-        //Client.ReceiveAsync();
         Client.Connect(ipAddress, port);
         Client.Login("admin", "password");
-        Client.Upload("test", "", new FileInfo("test").Name);
+        Client.Upload(TestFilePath, GetUploadPath(TestFilePath), true);
+    }
+
+    private string GetUploadPath(string localPath)
+    {
+        return Path.Combine(RootDirectory, "upload", localPath);
+    }
+
+    private string GetDownloadPath(string localPath)
+    {
+        return Path.Combine(RootDirectory, "download", localPath);
     }
 
     private void SingleButton_Click(object? sender, EventArgs e)
@@ -161,12 +156,12 @@ public class ClientTestBoostForm : ResizeableForm
         c2.Connect(ipAddress, port);
         c1.Connect(ipAddress, port);
         c1.SendMessage("c1;Hello World;");
-        c1.UploadFile(UploadFilePath);
+        c1.UploadFile(TestFilePath);
         //
         Thread.Sleep(100);
         //
         c2.SendMessage("c2;Hello Host;");
-        var uploadedPath = Path.Combine("upload", UploadFilePath);
+        var uploadedPath = Path.Combine("upload", TestFilePath);
         var downloadedPath = Path.Combine("download", uploadedPath);
         if (File.Exists(downloadedPath))
         {
@@ -184,7 +179,7 @@ public class ClientTestBoostForm : ResizeableForm
         //c1.Disconnet();
     }
 
-    static string UploadFilePath => "express test";
+    string RootDirectory { get; } = Directory.CreateDirectory(nameof(ClientTestBoostForm)).FullName;
 
     private void UpdateMessage(string message)
     {

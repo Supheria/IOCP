@@ -29,7 +29,6 @@ public class ClientOperator
         {
             Client.Connect(ipAddress, port);//增强实时性，使用无延迟发送
             Client.OnConnect += (p) => OnUpdateMessage?.Invoke($"{p.SocketInfo.LocalEndPoint} connected to {p.SocketInfo.RemoteEndPoint}");
-            Client.RootDirectoryPath = @"d:\temp";
             Client.OnMessage += (p, m) => OnUpdateMessage?.Invoke($"{p.SocketInfo.LocalEndPoint}: {m}");//接收到消息后处理事件
             Client.ReceiveAsync();
         }
@@ -72,29 +71,35 @@ public class ClientOperator
         }
     }
 
-    public void UploadFile(string localFilePath)
+    public void UploadFile(string localPath)
     {
         Client.OnUploaded += (p) => OnUpdateMessage?.Invoke($"{p.SocketInfo.LocalEndPoint}: download success");
         Client.Connect("127.0.0.1", 8000);
-        Client.RootDirectoryPath = @"d:\temp";
         Client.ReceiveAsync();
         Client.Login("admin", "password");
-        Client.Upload(localFilePath, "", new FileInfo(localFilePath).Name);
+        Client.Upload(localPath, GetUploadPath(localPath), true);
     }
 
-    public void DownloadFile(string remoteFilePath)
+    public void DownloadFile(string localPath)
     {
         //if (ClientFullHandlerSocket_MSG == null)
         {
             //Client = new();
             Client.OnDownloaded += (p) => OnUpdateMessage?.Invoke($"{p.SocketInfo.LocalEndPoint}: upload success");
             Client.Connect("127.0.0.1", 8000);
-            Client.RootDirectoryPath = "download";
             Client.ReceiveAsync();
             Client.Login("admin", "password");
         }
-        FileInfo fi = new FileInfo(remoteFilePath);
-        Client.Download(fi.DirectoryName, fi.Name, fi.DirectoryName.Substring(fi.DirectoryName.LastIndexOf("\\", StringComparison.Ordinal)));
+        Client.Download(GetUploadPath(localPath), GetDownloadPath(localPath), true);
+    }
 
+    private string GetUploadPath(string localPath)
+    {
+        return Path.Combine(Name, "upload", localPath);
+    }
+
+    private string GetDownloadPath(string  localPath)
+    {
+        return Path.Combine(Name, "download", localPath);
     }
 }
