@@ -30,7 +30,7 @@ public abstract class IocpProtocol : IDisposable
 
     protected FileStream? FileStream { get; set; } = null;
 
-    bool IsSendingAsync { get; set; } = false;
+    protected bool IsSendingAsync { get; set; } = false;
 
     protected bool IsLogin { get; set; } = false;
 
@@ -47,6 +47,8 @@ public abstract class IocpProtocol : IDisposable
     protected Dictionary<string, AutoDisposeFileStream> FileReaders { get; } = [];
 
     protected Dictionary<string, AutoDisposeFileStream> FileWriters { get; } = [];
+
+    ManualResetEvent SendDone { get; } = new(false);
 
     public void HandleException(Exception exception)
     {
@@ -157,11 +159,13 @@ public abstract class IocpProtocol : IDisposable
             return;
         }
         SocketInfo.Active();
+        //SendDone.Set();
         IsSendingAsync = false;
         SendBuffer.ClearFirstPacket(); // 清除已发送的包
         if (SendBuffer.GetFirstPacket(out var offset, out var count))
         {
             IsSendingAsync = true;
+            //SendDone.Reset();
             SendAsync(SendBuffer.DynamicBufferManager.Buffer, offset, count);
         }
     }
@@ -187,10 +191,19 @@ public abstract class IocpProtocol : IDisposable
         SendBuffer.EndPacket();
         if (IsSendingAsync)
             return;
+        //SendDone.WaitOne(ConstTabel.TimeoutMilliseconds);
         if (!SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
             return;
         IsSendingAsync = true;
-        SendAsync(SendBuffer.DynamicBufferManager.Buffer, packetOffset, packetCount);
+        try
+        {
+            SendAsync(SendBuffer.DynamicBufferManager.Buffer, packetOffset, packetCount);
+        }
+        catch
+        {
+            Close();
+            IsSendingAsync = false;
+        }
         return;
     }
 }

@@ -75,6 +75,7 @@ public partial class ClientProtocol
             return;
         }
         ReceiveAsync();
+        //ConnectDone.Set();
         new Task(() => OnConnect?.Invoke(this)).Start();
         SocketInfo.Connect(connectArgs.ConnectSocket);
     }

@@ -59,9 +59,9 @@ partial class ClientProtocol : IocpProtocol
             case ProtocolKey.Download:
                 DoDownload(commandParser, buffer, offset, count);
                 return;
-            case ProtocolKey.CheckConnection:
-                DoCheckConnection();
-                return;
+            //case ProtocolKey.CheckConnection:
+            //    DoCheckConnection();
+            //    return;
             default:
                 return;
         };
@@ -80,6 +80,7 @@ partial class ClientProtocol : IocpProtocol
     {
         IsLogin = true;
         HandleMessage($"{UserInfo?.Name} logined");
+        ConnectDone.Set();
     }
 
     private void DoDownload(CommandParser commandParser, byte[] buffer, int offset, int count)
@@ -156,6 +157,7 @@ partial class ClientProtocol : IocpProtocol
     {
         UserInfo = new(name, password);
         Login();
+        ConnectDone.Set();
     }
 
     private void Login()
@@ -246,26 +248,33 @@ partial class ClientProtocol : IocpProtocol
 
     public bool CheckConnection()
     {
-        var commandComposer = new CommandComposer()
-            .AppendCommand(ProtocolKey.CheckConnection);
-        for (var i = 0; i < ConstTabel.ReconnectTimesMax; i++)
-        {
-            SendCommand(commandComposer);
-            ConnectDone.WaitOne(ConstTabel.TimeoutMilliseconds);
-            if (IsLogin)
-                return true;
-            OnMessage?.Invoke($"trying reconnect: {i + 1} times");
-            Connect();
-            ReceiveAsync();
-            Login();
-        }
-        IsLogin = false;
-        return false;
+        Close();
+        Connect();
+        Login();
+        ConnectDone.WaitOne(ConstTabel.TimeoutMilliseconds);
+        ////var commandComposer = new CommandComposer()
+        ////    .AppendCommand(ProtocolKey.CheckConnection);
+        //IsLogin = false;
+        ////IsSendingAsync = false;
+        //for (var i = 0; i < ConstTabel.ReconnectTimesMax; i++)
+        //{
+        //    //SendCommand(commandComposer);
+        //    Connect();
+        //    ReceiveAsync();
+        //    ConnectDone.WaitOne(ConstTabel.TimeoutMilliseconds);
+        //    if (IsLogin)
+        //        return true;
+        //    OnMessage?.Invoke($"trying reconnect: {i + 1} times");
+        //}
+        ////IsLogin = false;
+        //Close();
+        //return false;
+        return true;
     }
 
-    private void DoCheckConnection()
-    {
-        IsLogin = true;
-        ConnectDone.Set();
-    }
+    //private void DoCheckConnection()
+    //{
+    //    IsLogin = true;
+    //    ConnectDone.Set();
+    //}
 }
