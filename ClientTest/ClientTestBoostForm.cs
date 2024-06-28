@@ -1,9 +1,5 @@
+using LocalUtilities.IocpNet.Protocol;
 using LocalUtilities.TypeGeneral;
-using Net;
-using System;
-using System.Diagnostics;
-using System.Net;
-using static ClientTest.ClientOperator;
 
 namespace ClientTest;
 

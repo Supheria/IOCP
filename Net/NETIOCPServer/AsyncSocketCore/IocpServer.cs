@@ -9,17 +9,9 @@ public class IocpServer
 
     public bool IsStart { get; private set; } = false;
 
-    /// <summary>
-    /// 最大支持连接个数
-    /// </summary>
     int ParallelCountMax { get; }
 
-    // TODO: remove this and use another way to limit paralle number
-
-    /// <summary>
-    /// Socket最大超时时间，单位为毫秒
-    /// </summary>
-    public int TimeoutMilliseconds { get; }
+    // TODO: use another way to limit paralle number
 
     ServerProtocolPool ProtocolPool { get; }
 
@@ -39,20 +31,20 @@ public class IocpServer
 
     public event EventHandler<int>? OnParallelRemainChange;
 
-    public IocpServer(int parallelCountMax, int timeoutMilliseconds)
+    public IocpServer(int parallelCountMax)
     {
         ParallelCountMax = parallelCountMax;
         ProtocolPool = new(parallelCountMax);
         DaemonThread = new(ProcessDaemon);
         for (int i = 0; i < ParallelCountMax; i++) //按照连接数建立读写对象
         {
-            var protocol = new ServerProtocol(this);
+            var protocol = new ServerProtocol();
             protocol.OnClosed += (_) =>
             {
                 ProtocolPool.Push(protocol);
                 ProtocolList.Remove(protocol);
-                OnClientNumberChange?.InvokeAsync(protocol, ClientState.Disconnect);
-                OnParallelRemainChange?.InvokeAsync(this, ProtocolPool.Count);
+                OnClientNumberChange?.Invoke(protocol, ClientState.Disconnect);
+                OnParallelRemainChange?.Invoke(this, ProtocolPool.Count);
             };
             protocol.OnException += (p, ex) => OnMessage?.Invoke(p, ex.Message);
             protocol.OnFileReceived += (p) => OnMessage?.Invoke(p, $"upload file success at {DateTime.Now}");
@@ -60,7 +52,6 @@ public class IocpServer
             protocol.OnMessage += (p, m) => OnMessage?.Invoke(p, m);
             ProtocolPool.Push(protocol);
         }
-        TimeoutMilliseconds = timeoutMilliseconds;
     }
 
     /// <summary>
@@ -68,12 +59,14 @@ public class IocpServer
     /// </summary>
     private void ProcessDaemon()
     {
-        ProtocolList.CopyTo(out var userTokenss);
-        foreach (var protocol in userTokenss)
+        ProtocolList.CopyTo(out var userTokens);
+        var timeout = ConstTabel.TimeoutMilliseconds;
+        foreach (var protocol in userTokens)
         {
             try
             {
-                if ((DateTime.Now - protocol.SocketInfo.ActiveTime).Milliseconds > TimeoutMilliseconds) //超时Socket断开
+                var span = DateTime.Now - protocol.SocketInfo.ActiveTime;
+                if (span.TotalMilliseconds > timeout) //超时Socket断开
                 {
                     lock (protocol)
                         protocol.Close();
@@ -85,16 +78,6 @@ public class IocpServer
                 //ServerInstance.Logger.Error(ex.StackTrace);
             }
         }
-    }
-
-    /// <summary>
-    /// 设置服务端SOCKET是否延迟，如果保证实时性，请设为true,默认为false
-    /// </summary>
-    /// <param name="NoDelay"></param>
-    /// 
-    public void SetNoDelay(bool NoDelay)
-    {
-        Socket.NoDelay = NoDelay;
     }
 
     public void Start(int port)
@@ -157,11 +140,11 @@ public class IocpServer
             return;
         }
         ProtocolList.Add(protocol);
-        OnParallelRemainChange?.InvokeAsync(this, ProtocolPool.Count);
+        OnParallelRemainChange?.Invoke(this, ProtocolPool.Count);
         try
         {
             protocol.ReceiveAsync();
-            OnClientNumberChange?.InvokeAsync(protocol, ClientState.Connect);
+            OnClientNumberChange?.Invoke(protocol, ClientState.Connect);
         }
         catch (Exception E)
         {
@@ -170,45 +153,5 @@ public class IocpServer
         }
         if (acceptArgs.SocketError is not SocketError.OperationAborted)
             StartAccept(acceptArgs); //把当前异步事件释放，等待下次连接
-    }
-
-    /// <summary>
-    /// 检测文件是否正在使用中，如果正在使用中则检测是否被上传协议占用，如果占用则关闭,真表示正在使用中，并没有关闭
-    /// </summary>
-    /// <param name="filePath"></param>
-    /// <returns></returns>
-    public bool CheckFileInUse(string filePath)
-    {
-        //if (isFileInUse())
-        //{
-        //    bool result = true;
-        //    ProtocolList.CopyTo(out var userTokenss);
-        //    foreach (var protocol in userTokenss)
-        //    {
-        //        if (!filePath.Equals(protocol.FilePath, StringComparison.CurrentCultureIgnoreCase))
-        //            continue;
-        //        lock (protocol) // AsyncSocketUserToken有多个线程访问
-        //        {
-        //            protocol.Close();
-        //        }
-        //        result = false;
-        //    }
-        //    return result;
-        //}
-        //return false;
-        return isFileInUse();
-        bool isFileInUse()
-        {
-            try
-            {
-                // 使用共享只读方式打开，可以支持多个客户端同时访问一个文件。
-                using var _ = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                return false;
-            }
-            catch
-            {
-                return true;
-            }
-        }
     }
 }

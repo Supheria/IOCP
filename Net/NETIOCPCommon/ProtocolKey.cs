@@ -65,29 +65,3 @@ public class ProtocolKey
     public const string CheckConnection = "CheckConnection";
 }
 
-public enum ProtocolCode
-{
-    Success,
-    NotExistCommand,
-    PacketLengthError,
-    PacketFormatError,
-    UnknowError,
-    CommandNoCompleted,
-    ParameterError,
-    ParameterInvalid,
-    UserOrPasswordError,
-    UserHasLogined,
-    FileNotExist,
-    NotOpenFile,
-    FileIsInUse,
-    FileIsExpired,
-    NotSameVersion,
-    Disconnection,
-
-    DirNotExist,
-    CreateDirError,
-    DeleteDirError,
-    DeleteFileFailed,
-    FileSizeError,
-    NotLogined,
-}

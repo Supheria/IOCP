@@ -66,7 +66,7 @@ public abstract class IocpProtocol : IDisposable
             IsSendingAsync = false;
             IsLogin = false;
             SocketInfo.Disconnect();
-            OnClosed?.InvokeAsync(this);
+            OnClosed?.Invoke(this);
             GC.SuppressFinalize(this);
         }
     }
@@ -74,7 +74,7 @@ public abstract class IocpProtocol : IDisposable
     public void ReceiveAsync()
     {
         var receiveArgs = new SocketAsyncEventArgs();
-        receiveArgs.SetBuffer(new byte[ReceiveBuffer.BufferSize], 0, ReceiveBuffer.BufferSize);
+        receiveArgs.SetBuffer(new byte[ReceiveBuffer.TotolCount], 0, ReceiveBuffer.TotolCount);
         receiveArgs.Completed += (_, args) => ProcessReceive(args);
         if (Socket is not null && !Socket.ReceiveAsync(receiveArgs))
         {
@@ -91,18 +91,19 @@ public abstract class IocpProtocol : IDisposable
             receiveArgs.SocketError is not SocketError.Success)
             goto CLOSE;
         SocketInfo.Active();
-        ReceiveBuffer.WriteBuffer(receiveArgs.Buffer!, receiveArgs.Offset, receiveArgs.BytesTransferred);
+        ReceiveBuffer.WriteData(receiveArgs.Buffer!, receiveArgs.Offset, receiveArgs.BytesTransferred);
         // 按照长度分包
         // 小于四个字节表示包头未完全接收，继续接收
         while (ReceiveBuffer.DataCount > sizeof(int))
         {
-            var packetLength = BitConverter.ToInt32(ReceiveBuffer.Buffer, 0);
+            var buffer = ReceiveBuffer.GetData();
+            var packetLength = BitConverter.ToInt32(buffer, 0);
             if (UseNetByteOrder)
                 packetLength = IPAddress.NetworkToHostOrder(packetLength);
             // 最大Buffer异常保护
             // buffer = [totol legth] + [command length] + [command] + [data]
             var offset = sizeof(int); // totol length
-            var commandLength = BitConverter.ToInt32(ReceiveBuffer.Buffer, offset); //取出命令长度
+            var commandLength = BitConverter.ToInt32(buffer, offset); //取出命令长度
             offset += sizeof(int); // command length
             var bufferMax = ConstTabel.TransferBufferMax + commandLength + offset;
             if (packetLength > bufferMax || ReceiveBuffer.DataCount > bufferMax)
@@ -110,12 +111,12 @@ public abstract class IocpProtocol : IDisposable
             // 收到的数据没有达到包长度，继续接收
             if (ReceiveBuffer.DataCount < packetLength)
                 goto RECEIVE;
-            var command = Encoding.UTF8.GetString(ReceiveBuffer.Buffer, offset, commandLength);
+            var command = Encoding.UTF8.GetString(buffer, offset, commandLength);
             var commandParser = CommandParser.Parse(command);
             offset += commandLength;
             // 处理命令,offset + sizeof(int) + commandLen后面的为数据，数据的长度为count - sizeof(int) - sizeof(int) - length，注意是包的总长度－包长度所占的字节（sizeof(int)）－ 命令长度所占的字节（sizeof(int)） - 命令的长度
-            ProcessCommand(commandParser, ReceiveBuffer.Buffer, offset, packetLength - offset);
-            ReceiveBuffer.Clear(packetLength);
+            ProcessCommand(commandParser, buffer, offset, packetLength - offset);
+            ReceiveBuffer.RemoveData(packetLength);
         }
     RECEIVE:
         ReceiveAsync();
@@ -147,14 +148,12 @@ public abstract class IocpProtocol : IDisposable
             return;
         }
         SocketInfo.Active();
-        //SendDone.Set();
         IsSendingAsync = false;
         SendBuffer.ClearFirstPacket(); // 清除已发送的包
         if (SendBuffer.GetFirstPacket(out var offset, out var count))
         {
             IsSendingAsync = true;
-            //SendDone.Reset();
-            SendAsync(SendBuffer.DynamicBufferManager.Buffer, offset, count);
+            SendAsync(SendBuffer.DynamicBufferManager.GetData(), offset, count);
         }
     }
 
@@ -172,10 +171,10 @@ public abstract class IocpProtocol : IDisposable
         // 获取总大小(4个字节的包总长度+4个字节的命令长度+命令字节数组的长度+数据的字节数组长度)
         int totalLength = sizeof(int) + sizeof(int) + commandBuffer.Length + count;
         SendBuffer.StartPacket();
-        SendBuffer.DynamicBufferManager.WriteInt(totalLength, false); // 写入总大小
-        SendBuffer.DynamicBufferManager.WriteInt(commandBuffer.Length, false); // 写入命令大小
-        SendBuffer.DynamicBufferManager.WriteBuffer(commandBuffer); // 写入命令内容
-        SendBuffer.DynamicBufferManager.WriteBuffer(buffer, offset, count); // 写入二进制数据
+        SendBuffer.DynamicBufferManager.WriteValue(totalLength, false); // 写入总大小
+        SendBuffer.DynamicBufferManager.WriteValue(commandBuffer.Length, false); // 写入命令大小
+        SendBuffer.DynamicBufferManager.WriteData(commandBuffer); // 写入命令内容
+        SendBuffer.DynamicBufferManager.WriteData(buffer, offset, count); // 写入二进制数据
         SendBuffer.EndPacket();
         if (IsSendingAsync)
             return;
@@ -184,7 +183,7 @@ public abstract class IocpProtocol : IDisposable
         IsSendingAsync = true;
         try
         {
-            SendAsync(SendBuffer.DynamicBufferManager.Buffer, packetOffset, packetCount);
+            SendAsync(SendBuffer.DynamicBufferManager.GetData(), packetOffset, packetCount);
         }
         catch
         {

@@ -15,12 +15,7 @@ public class ConstTabel
 
     public static int TransferBufferMax { get; } = 1024 * 1024;
 
-    /// <summary>
-    /// Socket超时设置为60秒
-    /// </summary>
-    public static int TimeoutMilliseconds { get; } = 1 * 1000;
+    public static int TimeoutMilliseconds { get; } = 30 * 1000;
 
     public static int FileStreamExpireMilliseconds { get; } = 5 * 1000;
-
-    public static int ReconnectTimesMax { get; } = 5;
 }

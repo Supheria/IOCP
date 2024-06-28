@@ -4,7 +4,7 @@ class DaemonThread
 {
     System.Timers.Timer Timer { get; } = new()
     {
-        Interval = 1000, // 每分钟检测一次
+        Interval = ConstTabel.TimeoutMilliseconds, // 每分钟检测一次
         Enabled = false,
         AutoReset = true,
     };

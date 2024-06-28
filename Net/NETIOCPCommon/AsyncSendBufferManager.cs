@@ -53,7 +53,7 @@ public class AsyncSendBufferManager(int bufferSize)
             return false;
         lock (Locker)
         {
-            DynamicBufferManager.Clear(SendPacketList[0].Count);
+            DynamicBufferManager.RemoveData(SendPacketList[0].Count);
             SendPacketList.RemoveAt(0);
         }
         return true;
@@ -64,7 +64,7 @@ public class AsyncSendBufferManager(int bufferSize)
         lock (Locker)
         {
             SendPacketList.Clear();
-            DynamicBufferManager.Clear(DynamicBufferManager.DataCount);
+            DynamicBufferManager.RemoveData(DynamicBufferManager.DataCount);
         }
     }
 }

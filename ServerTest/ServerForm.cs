@@ -1,9 +1,8 @@
 
 
+using LocalUtilities.IocpNet.Protocol;
+using LocalUtilities.IocpNet.Server;
 using LocalUtilities.TypeGeneral;
-using Net;
-using System.Text;
-using System.Windows.Forms;
 
 namespace WarringStates.UI;
 
@@ -11,7 +10,7 @@ internal class ServerForm : ResizeableForm
 {
     public override string LocalName => nameof(ServerForm);
 
-    IocpServer Server { get; } = new(1000, 1 * 60 * 1000);
+    IocpServer Server { get; } = new(1000);
 
     Button SwitchButton { get; } = new()
     {
