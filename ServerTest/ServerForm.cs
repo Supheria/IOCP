@@ -45,10 +45,9 @@ internal class ServerForm : ResizeableForm
         OnDrawingClient += DrawClient;
         SwitchButton.Click += SwitchButton_Click;
         Server.OnClientNumberChange += Server_OnClientNumberChange;
-        Server.OnReceiveMessage += Server_OnReceiveMessage;
+        Server.OnMessage += Server_OnReceiveMessage;
         //Server.OnReceiveClientData += Server_ReceiveClientData;
         Server.OnParallelRemainChange += Server_OnParalleRemainChange;
-        Server.OnTip += Server_OnTip;
         Shown += (_, _) => Server.Start((int)Port.Value);
     }
 
@@ -57,7 +56,7 @@ internal class ServerForm : ResizeableForm
         UpdateMessage($"tip: {protocol.SocketInfo.RemoteEndPoint} {tip}");
     }
 
-    private void Server_OnParalleRemainChange(int remain)
+    private void Server_OnParalleRemainChange(object? sender, int remain)
     {
         lock (ParallelRemain)
         {
@@ -69,7 +68,7 @@ internal class ServerForm : ResizeableForm
         }
     }
 
-    private void Server_OnReceiveMessage(string message, ServerProtocol protocol)
+    private void Server_OnReceiveMessage(IocpProtocol protocol, string message)
     {
         if (message.Contains(";"))
         {
@@ -92,7 +91,7 @@ internal class ServerForm : ResizeableForm
             UpdateMessage($"{protocol.SocketInfo.RemoteEndPoint}: {message}");
     }
 
-    private void Server_OnClientNumberChange(IocpServer.ClientState state, ServerProtocol protocol)
+    private void Server_OnClientNumberChange(IocpProtocol protocol, IocpServer.ClientState state)
     {
         if (state is IocpServer.ClientState.Connect)
         {

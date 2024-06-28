@@ -1,17 +1,11 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
 namespace Net;
 
-public delegate void HandleException(Exception exception);
-
 public abstract class IocpProtocol : IDisposable
 {
-    public delegate void HandleEvent(IocpProtocol protocol);
-
     protected Socket? Socket { get; set; } = null;
 
     public SocketInfo SocketInfo { get; } = new();
@@ -26,8 +20,6 @@ public abstract class IocpProtocol : IDisposable
 
     public string FilePath { get; protected set; } = "";
 
-    protected byte[]? ReadBuffer { get; set; } = null;
-
     protected FileStream? FileStream { get; set; } = null;
 
     protected bool IsSendingAsync { get; set; } = false;
@@ -38,23 +30,17 @@ public abstract class IocpProtocol : IDisposable
 
     object CloseLocker { get; } = new();
 
-    public event HandleEvent? OnClosed;
-
-    public void Close() => Dispose();
-
-    public event HandleException? OnException;
-
     protected Dictionary<string, AutoDisposeFileStream> FileReaders { get; } = [];
 
     protected Dictionary<string, AutoDisposeFileStream> FileWriters { get; } = [];
 
-    ManualResetEvent SendDone { get; } = new(false);
+    public IocpEventHandler? OnClosed;
 
-    public void HandleException(Exception exception)
-    {
-        //OnException?.Invoke(exception);
-        new Task(() => OnException?.Invoke(exception)).Start();
-    }
+    public IocpEventHandler<Exception>? OnException;
+
+    public IocpEventHandler<string>? OnMessage;
+
+    public void Close() => Dispose();
 
     public void Dispose()
     {
@@ -77,9 +63,11 @@ public abstract class IocpProtocol : IDisposable
             FilePath = "";
             FileStream?.Close();
             FileStream = null;
+            IsSendingAsync = false;
+            IsLogin = false;
             SocketInfo.Disconnect();
+            OnClosed?.InvokeAsync(this);
             GC.SuppressFinalize(this);
-            new Task(() => OnClosed?.Invoke(this)).Start();
         }
     }
 
@@ -191,7 +179,6 @@ public abstract class IocpProtocol : IDisposable
         SendBuffer.EndPacket();
         if (IsSendingAsync)
             return;
-        //SendDone.WaitOne(ConstTabel.TimeoutMilliseconds);
         if (!SendBuffer.GetFirstPacket(out var packetOffset, out var packetCount))
             return;
         IsSendingAsync = true;
@@ -206,4 +193,5 @@ public abstract class IocpProtocol : IDisposable
         }
         return;
     }
+    public abstract void SendMessage(string message);
 }

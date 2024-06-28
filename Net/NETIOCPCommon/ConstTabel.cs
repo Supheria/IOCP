@@ -20,7 +20,7 @@ public class ConstTabel
     /// </summary>
     public static int TimeoutMilliseconds { get; } = 1 * 1000;
 
-    public static int FileStreamExpireMilliseconds { get; } = 20 * 1000;
+    public static int FileStreamExpireMilliseconds { get; } = 5 * 1000;
 
     public static int ReconnectTimesMax { get; } = 5;
 }

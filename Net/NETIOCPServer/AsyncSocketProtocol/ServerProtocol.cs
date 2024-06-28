@@ -1,8 +1,4 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
+﻿using System.Net.Sockets;
 
 namespace Net;
 
@@ -11,6 +7,10 @@ public partial class ServerProtocol(IocpServer server)
     IocpServer Server { get; } = server;
 
     object AcceptLocker { get; } = new();
+
+    public IocpEventHandler? OnFileReceived;
+
+    public IocpEventHandler? OnFileSent;
 
     public bool ProcessAccept(Socket? acceptSocket)
     {

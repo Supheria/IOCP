@@ -33,17 +33,11 @@ public class IocpServer
         Disconnect,
     }
 
-    public delegate void HandleMessage(string message, ServerProtocol protocol);
+    public event IocpEventHandler<string>? OnMessage;
 
-    public delegate void ClientNumberChange(ClientState state, ServerProtocol protocol);
+    public event IocpEventHandler<ClientState>? OnClientNumberChange;
 
-    public delegate void ParallelRemainChange(int remain);
-
-    public event HandleMessage? OnReceiveMessage;
-
-    public event ClientNumberChange? OnClientNumberChange;
-
-    public event ParallelRemainChange? OnParallelRemainChange;
+    public event EventHandler<int>? OnParallelRemainChange;
 
     public IocpServer(int parallelCountMax, int timeoutMilliseconds)
     {
@@ -57,10 +51,13 @@ public class IocpServer
             {
                 ProtocolPool.Push(protocol);
                 ProtocolList.Remove(protocol);
-                OnClientNumberChange?.Invoke(ClientState.Disconnect, protocol);
-                OnParallelRemainChange?.Invoke(ProtocolPool.Count);
+                OnClientNumberChange?.InvokeAsync(protocol, ClientState.Disconnect);
+                OnParallelRemainChange?.InvokeAsync(this, ProtocolPool.Count);
             };
-            protocol.OnException += (ex) => OnReceiveMessage?.Invoke(ex.Message, protocol);
+            protocol.OnException += (p, ex) => OnMessage?.Invoke(p, ex.Message);
+            protocol.OnFileReceived += (p) => OnMessage?.Invoke(p, $"upload file success at {DateTime.Now}");
+            protocol.OnFileSent += (p) => OnMessage?.Invoke(p, $"download file success at {DateTime.Now}");
+            protocol.OnMessage += (p, m) => OnMessage?.Invoke(p, m);
             ProtocolPool.Push(protocol);
         }
         TimeoutMilliseconds = timeoutMilliseconds;
@@ -160,11 +157,11 @@ public class IocpServer
             return;
         }
         ProtocolList.Add(protocol);
-        new Task(() => OnParallelRemainChange?.Invoke(ProtocolPool.Count)).Start();
+        OnParallelRemainChange?.InvokeAsync(this, ProtocolPool.Count);
         try
         {
             protocol.ReceiveAsync();
-            new Task(() => OnClientNumberChange?.Invoke(ClientState.Connect, protocol)).Start();
+            OnClientNumberChange?.InvokeAsync(protocol, ClientState.Connect);
         }
         catch (Exception E)
         {
@@ -173,11 +170,6 @@ public class IocpServer
         }
         if (acceptArgs.SocketError is not SocketError.OperationAborted)
             StartAccept(acceptArgs); //把当前异步事件释放，等待下次连接
-    }
-
-    public void HandleReceiveMessage(string message, ServerProtocol protocol)
-    {
-        new Task(() => OnReceiveMessage?.Invoke(message, protocol)).Start();
     }
 
     /// <summary>
@@ -218,15 +210,5 @@ public class IocpServer
                 return true;
             }
         }
-    }
-
-    // TODO: make this reuseable
-    public delegate void HandleTip(string tip, ServerProtocol protocol);
-
-    public event HandleTip? OnTip;
-
-    public void Tip(string tip, ServerProtocol protocol)
-    {
-        new Task(() => OnTip?.Invoke(tip, protocol)).Start();
     }
 }

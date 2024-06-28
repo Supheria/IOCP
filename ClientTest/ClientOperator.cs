@@ -27,21 +27,6 @@ public class ClientOperator
 
     //ClientProtocol ClientFullHandlerSoclet_DOWNLOAD { get; set; }
 
-    private void OnConncet(IocpProtocol protocol)
-    {
-        OnUpdateMessage?.Invoke($"{protocol.UserInfo.Name} connect to {protocol.SocketInfo.RemoteEndPoint}");
-    }
-
-    void UploadEvent_UploadProcess(IocpProtocol protocol)
-    {
-        OnUpdateMessage?.Invoke($"{Name}: 文件上传完成");
-    }
-
-    void DownLoadEvent_DownLoadProcess(IocpProtocol protocol)
-    {
-        OnUpdateMessage?.Invoke($"{Name}: 文件下载完成");
-    }
-
     public void Connect(string ipAddress, int port)
     {
         //Client = new(); // 消息发送不需要挂接事件
@@ -49,14 +34,14 @@ public class ClientOperator
         try
         {
             Client.Connect(ipAddress, port);//增强实时性，使用无延迟发送
-            Client.OnConnect += OnConncet;
+            Client.OnConnect += (p) => OnUpdateMessage?.Invoke($"{p.SocketInfo.LocalEndPoint} connected to {p.SocketInfo.RemoteEndPoint}");
             Client.RootDirectoryPath = @"d:\temp";
-            Client.OnMessage += appHandler_OnReceivedMsg;//接收到消息后处理事件
+            Client.OnMessage += (p, m) => OnUpdateMessage?.Invoke($"{p.SocketInfo.LocalEndPoint}: {m}");//接收到消息后处理事件
             Client.ReceiveAsync();
         }
         catch (Exception ex)
         {
-            OnUpdateMessage?.Invoke($"{Name}: {ex.Message}");
+            OnUpdateMessage?.Invoke($"{Client.SocketInfo.LocalEndPoint}: {ex.Message}");
             //ClientFullHandlerSocket_MSG.logger.Info("Connect failed");
             return;
         }
@@ -93,19 +78,9 @@ public class ClientOperator
         }
     }
 
-    private void appHandler_OnReceivedMsg(string message)
-    {
-        //在通信框架外写业务逻辑
-        if (message.Contains("result"))
-        {
-            OnUpdateMessage?.Invoke($"{Name}: {message}");
-        }
-
-    }
-
     public void UploadFile(string localFilePath)
     {
-        Client.OnUploaded += (IocpProtocol protocol) => OnUpdateMessage?.Invoke($"{Name}: 文件上传完成");
+        Client.OnUploaded += (p) => OnUpdateMessage?.Invoke($"{p.SocketInfo.LocalEndPoint}: download success");
         Client.Connect("127.0.0.1", 8000);
         Client.RootDirectoryPath = @"d:\temp";
         Client.ReceiveAsync();
@@ -118,7 +93,7 @@ public class ClientOperator
         //if (ClientFullHandlerSocket_MSG == null)
         {
             //Client = new();
-            Client.OnDownloaded += DownLoadEvent_DownLoadProcess; // 只挂接下载事件
+            Client.OnDownloaded += (p) => OnUpdateMessage?.Invoke($"{p.SocketInfo.LocalEndPoint}: upload success");
             Client.Connect("127.0.0.1", 8000);
             Client.RootDirectoryPath = "download";
             Client.ReceiveAsync();

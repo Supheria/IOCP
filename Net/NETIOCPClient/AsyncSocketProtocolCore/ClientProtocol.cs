@@ -1,21 +1,19 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Net;
 
-public delegate void HandleMessage(string message);
-
 public partial class ClientProtocol
 {
-    public event HandleMessage? OnMessage;
+    public IocpEventHandler? OnUploaded;
 
-    public event HandleEvent? OnConnect;
+    public IocpEventHandler? OnDownloaded;
 
-    public event HandleEvent? OnUploaded;
+    public IocpEventHandler<float>? OnUploading;
 
-    public event HandleEvent? OnDownloaded;
+    public IocpEventHandler<float>? OnDownloading;
 
     EndPoint? RemoteEndPoint { get; set; } = null;
 
@@ -78,32 +76,5 @@ public partial class ClientProtocol
         //ConnectDone.Set();
         new Task(() => OnConnect?.Invoke(this)).Start();
         SocketInfo.Connect(connectArgs.ConnectSocket);
-    }
-
-    public bool CheckErrorCode(CommandParser commandParser)
-    {
-        commandParser.GetValueAsInt(ProtocolKey.Code, out var errorCode);
-        if ((ProtocolCode)errorCode is ProtocolCode.Success)
-            return true;
-        else
-        {
-            //ErrorString = ProtocolCode.GetErrorCodeString(errorCode);
-            return false;
-        }
-    }
-
-    public void HandleMessage(string message)
-    {
-        new Task(() => OnMessage?.Invoke(message)).Start();
-    }
-
-    public void HandleDownload()
-    {
-        new Task(() => OnDownloaded?.Invoke(this)).Start();
-    }
-
-    public void HandleUploaded()
-    {
-        new Task(() => OnUploaded?.Invoke(this)).Start();
     }
 }

@@ -1,5 +1,8 @@
 using LocalUtilities.TypeGeneral;
 using Net;
+using System;
+using System.Diagnostics;
+using System.Net;
 using static ClientTest.ClientOperator;
 
 namespace ClientTest;
@@ -65,24 +68,26 @@ public class ClientTestBoostForm : ResizeableForm
         Timer.Interval = 100;
         Timer.Elapsed += (_, _) => Test();
 
-
-        var ipAddress = IpAddress.Text;
-        _ = int.TryParse(Port.Text, out var port);
-        Client.OnDownloaded += (IocpProtocol protocol) => UpdateMessage($"文件下载完成");
-        Client.OnUploaded += (IocpProtocol protocol) => UpdateMessage($"文件上传完成");
-        Client.OnUploading += (string progress) => UpdateMessage($"已上传 {progress}");
-        Client.OnDownloading += (string progress) => UpdateMessage($"已下载 {progress}");
-        Client.OnMessage += (string message) => UpdateMessage($"{message}");
-        Client.OnException += (ex) => UpdateMessage(ex.Message);
-        Client.Connect(ipAddress, port);
-        Client.Login("admin", "password");
+        Client.OnUploaded += (p) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: upload file success");
+        Client.OnDownloaded += (p) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: download file success");
+        Client.OnUploading += (p, progress) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: uploading {progress}%");
+        Client.OnDownloading += (p, progress) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: downloading {progress}%");
+        Client.OnMessage += (p, m) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: {m}");
+        Client.OnException += (p, ex) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: {ex.Message}");
+        Client.OnClosed += (p) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: closed");
+        //Client.Connect(ipAddress, port);
     }
 
     private void DownloadButton_Click(object? sender, EventArgs e)
     {
+
+        var ipAddress = IpAddress.Text;
+        _ = int.TryParse(Port.Text, out var port);
         //Client.Connect(ipAddress, port);
         //Client.RootDirectoryPath = "download";
         //Client.ReceiveAsync();
+        Client.Connect(ipAddress, port);
+        Client.Login("admin", "password");
         Client.RootDirectoryPath = "download";
         var uploadedPath = Path.Combine("upload", UploadFilePath);
         var downloadedPath = Path.Combine("download", uploadedPath);
@@ -100,9 +105,14 @@ public class ClientTestBoostForm : ResizeableForm
 
     private void UploadButton_Click(object? sender, EventArgs e)
     {
+
+        var ipAddress = IpAddress.Text;
+        _ = int.TryParse(Port.Text, out var port);
         //Client.Connect(ipAddress, port);
         //Client.RootDirectoryPath = @"d:\temp";
         //Client.ReceiveAsync();
+        Client.Connect(ipAddress, port);
+        Client.Login("admin", "password");
         Client.Upload("test", "", new FileInfo("test").Name);
     }
 
