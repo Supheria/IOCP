@@ -93,6 +93,7 @@ public class ClientForm : ResizeableForm
         Client.OnDisconnected += () => UpdateSwitchButtonText(true);
         OnLoadForm += ClientForm_OnLoadForm;
         OnSaveForm += ClientForm_OnSaveForm;
+        FormClosing += (_, _) => Client.Disconnect();
     }
 
     private void ClientForm_OnSaveForm(SsSerializer serializer)

@@ -18,7 +18,8 @@ internal class HostForm : ResizeableForm
 
     Button SwitchButton { get; } = new()
     {
-        Text = "Start"
+        //Text = "Start"
+        Text = "Stop"
     };
 
     Label ParallelCount { get; } = new()
@@ -50,7 +51,8 @@ internal class HostForm : ResizeableForm
         OnDrawClient += DrawClient;
         SwitchButton.Click += SwitchButton_Click;
         Host.OnLog += UpdateMessage;
-        Host.OnParallelRemainChange += Host_OnParallelRemainChange;
+        Host.OnParallelRemainChange += Host_OnParallelRemainChange;Host.Start((int)Port.Value);
+        Host.Start((int)Port.Value);
     }
 
     private void Host_OnParallelRemainChange(int args)

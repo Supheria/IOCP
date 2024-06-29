@@ -1,5 +1,7 @@
 //using ClientDemo;
 
+using WarringStates.UI;
+
 namespace ClientTest
 {
     internal static class Program
@@ -8,7 +10,7 @@ namespace ClientTest
         static void Main()
         {
             //new Client().Show();
-            Application.Run(new ClientTestBoostForm());
+            Application.Run(new ClientForm());
         }
     }
 }
