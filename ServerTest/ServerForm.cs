@@ -1,111 +1,69 @@
-
-
 using LocalUtilities.IocpNet.Protocol;
-using LocalUtilities.IocpNet.Server;
+using LocalUtilities.IocpNet.Serve;
 using LocalUtilities.TypeGeneral;
+using System.Windows.Forms;
 
 namespace WarringStates.UI;
 
-internal class ServerForm : ResizeableForm
+internal class HostForm : ResizeableForm
 {
-    public override string LocalName => nameof(ServerForm);
+    public override string LocalName => nameof(HostForm);
 
-    IocpServer Server { get; } = new(1000);
-
-    Button SwitchButton { get; } = new()
-    {
-        //Text = "Start"
-        // TODO: debug using
-        Text = "Stop"
-    };
+    IocpHost Host { get; set; } = new(1000);
 
     NumericUpDown Port { get; } = new()
     {
-        Maximum = short.MaxValue,
-        Value = 8000,
+        Value = 60,
+    };
+
+    Button SwitchButton { get; } = new()
+    {
+        Text = "Start"
+    };
+
+    Label ParallelCount { get; } = new()
+    {
+        TextAlign = ContentAlignment.MiddleCenter,
+        Text = "0",
     };
 
     RichTextBox MessageBox { get; } = new();
 
-    Label ParallelRemain { get; } = new()
+    TextBox SendBox { get; } = new();
+
+    Button SendButton { get; } = new()
     {
-        TextAlign = ContentAlignment.MiddleRight,
+        Text = "Send",
     };
 
-    protected override void InitializeComponent()
+    public HostForm()
     {
         Text = "tcp server";
         Controls.AddRange([
-            SwitchButton,
             Port,
+            SwitchButton,
+            ParallelCount,
             MessageBox,
-            ParallelRemain,
+            SendBox,
+            SendButton,
             ]);
-        OnDrawingClient += DrawClient;
+        OnDrawClient += DrawClient;
         SwitchButton.Click += SwitchButton_Click;
-        Server.OnClientNumberChange += Server_OnClientNumberChange;
-        Server.OnMessage += Server_OnReceiveMessage;
-        //Server.OnReceiveClientData += Server_ReceiveClientData;
-        Server.OnParallelRemainChange += Server_OnParalleRemainChange;
-        Shown += (_, _) => Server.Start((int)Port.Value);
+        Host.OnLog += UpdateMessage;
+        Host.OnParallelRemainChange += Host_OnParallelRemainChange;
     }
 
-    private void Server_OnTip(string tip, ServerProtocol protocol)
+    private void Host_OnParallelRemainChange(int args)
     {
-        UpdateMessage($"tip: {protocol.SocketInfo.RemoteEndPoint} {tip}");
-    }
-
-    private void Server_OnParalleRemainChange(object? sender, int remain)
-    {
-        lock (ParallelRemain)
+        lock (ParallelCount)
         {
-            Invoke(new Action(() =>
+            Invoke(() =>
             {
-                ParallelRemain.Text = $"remain: {remain}";
+                ParallelCount.Text = args.ToString();
                 Update();
-            }));
+            });
         }
     }
-
-    private void Server_OnReceiveMessage(IocpProtocol protocol, string message)
-    {
-        if (message.Contains(";"))
-        {
-            var sentence = message.Split(';');
-            foreach (var s in sentence)
-            {
-                if (!string.IsNullOrWhiteSpace(s))
-                {
-                    UpdateMessage($"{protocol.SocketInfo.RemoteEndPoint}: {s}");
-                }
-            }
-        }
-        else if (message.Contains("computer"))
-        {
-            // TODO: use SendAsync directly
-            protocol.SendMessage("result0123456789.9876543210");
-            //protocol.SendAsync("result0123456789.9876543210");
-        }
-        else
-            UpdateMessage($"{protocol.SocketInfo.RemoteEndPoint}: {message}");
-    }
-
-    private void Server_OnClientNumberChange(IocpProtocol protocol, IocpServer.ClientState state)
-    {
-        if (state is IocpServer.ClientState.Connect)
-        {
-            UpdateMessage($"{protocol.SocketInfo.RemoteEndPoint} connect");
-        }
-        else
-        {
-            UpdateMessage($"{protocol.SocketInfo.RemoteEndPoint} disconnect");
-        }
-    }
-
-    //private void Server_ReceiveClientData(AsyncClientProfile client, byte[] buff)
-    //{
-    //    UpdateMessage($"{client.RemoteEndPoint}: {Encoding.UTF8.GetString(buff)}");
-    //}
 
     private void UpdateMessage(string message)
     {
@@ -121,18 +79,18 @@ internal class ServerForm : ResizeableForm
 
     private void SwitchButton_Click(object? sender, EventArgs e)
     {
-        if (Server.IsStart)
+        if (Host.IsStart)
         {
-            Server.Stop();
-            if (!Server.IsStart)
+            Host.Stop();
+            if (!Host.IsStart)
                 SwitchButton.Text = "Start";
             else
                 System.Windows.Forms.MessageBox.Show($"close server failed");
         }
         else
         {
-            Server.Start((int)Port.Value);
-            if (Server.IsStart)
+            Host.Start((int)Port.Value);
+            if (Host.IsStart)
                 SwitchButton.Text = "Close";
             else
                 System.Windows.Forms.MessageBox.Show($"start server failed");
@@ -141,23 +99,34 @@ internal class ServerForm : ResizeableForm
 
     private void DrawClient()
     {
-        var width = ClientWidth / 5;
+        var width = (ClientWidth - Padding * 5) / 3;
+        var top = ClientTop + Padding;
         //
-        Port.Left = ClientLeft + width;
-        Port.Top = ClientTop + Padding;
+        Port.Left = ClientLeft + Padding;
+        Port.Top = top;
         Port.Width = width;
         //
-        SwitchButton.Left = Port.Right + width;
-        SwitchButton.Top = ClientTop + Padding;
+        SwitchButton.Left = Port.Right + Padding;
+        SwitchButton.Top = top;
         SwitchButton.Width = width;
+        //
+        ParallelCount.Left = SwitchButton.Right + Padding;
+        ParallelCount.Top = top;
+        ParallelCount.Width = width;
         //
         MessageBox.Left = ClientLeft + Padding;
         MessageBox.Top = SwitchButton.Bottom + Padding;
         MessageBox.Width = ClientWidth - Padding * 2;
-        MessageBox.Height = ClientHeight - Port.Height - ParallelRemain.Height - Padding * 2;
+        MessageBox.Height = ClientHeight - Port.Height - SendButton.Height - Padding * 4;
         //
-        ParallelRemain.Left = ClientLeft + Padding;
-        ParallelRemain.Top = MessageBox.Bottom;
-        ParallelRemain.Width = ClientWidth - Padding * 2;
+        top = MessageBox.Bottom + Padding;
+        //
+        SendBox.Left = ClientLeft + Padding;
+        SendBox.Top = top;
+        SendBox.Width = width * 2 + Padding;
+        //
+        SendButton.Left = SendBox.Right + Padding;
+        SendButton.Top = top;
+        SendButton.Width = width;
     }
 }

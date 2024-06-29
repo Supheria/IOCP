@@ -1,231 +1,224 @@
-using LocalUtilities.FileHelper;
-using LocalUtilities.IocpNet.Protocol;
+using LocalUtilities.IocpNet.Serve;
+using LocalUtilities.SimpleScript.Serialization;
 using LocalUtilities.TypeGeneral;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
 
-namespace ClientTest;
+namespace WarringStates.UI;
 
-public class ClientTestBoostForm : ResizeableForm
+public class ClientForm : ResizeableForm
 {
-    public override string LocalName => nameof(ClientTestBoostForm);
+    public override string LocalName => nameof(ClientForm);
 
-    ClientProtocol Client { get; } = new();
+    IocpClient Client { get; } = new();
 
-    TextBox IpAddressBox { get; } = new()
+    TextBox HostAddress { get; } = new()
     {
-        Text = "127.0.0.1",
+        Text = "127.0.0.1"
     };
 
-    TextBox PortBox { get; } = new()
+    NumericUpDown HostPort { get; } = new()
     {
-        Text = 8000.ToString(),
+        Value = 60,
     };
 
-    Button LoginButton { get; } = new()
+    TextBox UserName { get; } = new()
     {
-        Text = "login"
+        Text = "admin"
     };
 
-    Button SingleButton { get; } = new()
+    TextBox Password { get; } = new()
     {
-        Text = "single"
+        Text = "password"
     };
 
-    Button UploadButton { get; } = new()
+    Button SwitchButton { get; } = new()
     {
-        Text = "upload"
-    };
-
-    Button DownloadButton { get; } = new()
-    {
-        Text = "download"
+        Text = "Connect",
     };
 
     RichTextBox MessageBox { get; } = new();
 
-    System.Timers.Timer Timer { get; } = new();
+    TextBox SendBox { get; } = new();
 
-    bool IsStart { get; set; } = false;
-
-    protected override void InitializeComponent()
+    Button SendButton { get; } = new()
     {
+        Text = "Send",
+    };
+
+    ComboBox DirName { get; } = new();
+
+    TextBox FilePath { get; } = new();
+
+    Button FilePathButton { get; } = new()
+    {
+        Text = "..."
+    };
+
+    Button UploadButton { get; } = new()
+    {
+        Text = "Upload"
+    };
+
+    Button DownloadButton { get; } = new()
+    {
+        Text = "Download"
+    };
+
+    public ClientForm()
+    {
+        Text = "client";
         Controls.AddRange([
-            LoginButton,
-            IpAddressBox,
-            PortBox,
+            HostAddress,
+            HostPort,
+            UserName,
+            Password,
+            SwitchButton,
             MessageBox,
-            SingleButton,
+            SendBox,
+            SendButton,
+            DirName,
+            FilePath,
+            FilePathButton,
             UploadButton,
             DownloadButton,
             ]);
-        OnDrawingClient += DrawClient;
-        LoginButton.Click += Login;
-        SingleButton.Click += SingleButton_Click;
-        UploadButton.Click += UploadButton_Click;
-        DownloadButton.Click += DownloadButton_Click;
-        Timer.Interval = 100;
-        Timer.Elapsed += (_, _) => Test();
-
-        Client.OnUploaded += (p) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: upload file success");
-        Client.OnDownloaded += (p) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: download file success");
-        Client.OnUploading += (p, progress) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: uploading {progress}%");
-        Client.OnDownloading += (p, progress) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: downloading {progress}%");
-        Client.OnMessage += (p, m) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: {m}");
-        Client.OnException += (p, ex) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: {ex.Message}");
-        Client.OnClosed += (p) => UpdateMessage($"{p.SocketInfo.LocalEndPoint}: closed");
-        //Client.Connect(IpAddress, port);
+        OnDrawClient += ClientForm_OnDrawClient;
+        SwitchButton.Click += SwitchButton_Click;
+        SendButton.Click += (_, _) => Client.SendMessage(SendBox.Text);
+        FilePathButton.Click += FilePathButton_Click;
+        UploadButton.Click += (_, _) => Client.Upload(DirName.Text, FilePath.Text);
+        DownloadButton.Click += (_, _) => Client.Download(DirName.Text, FilePath.Text);
+        Client.OnLog += UpdateMessage;
+        Client.OnConnected += () => UpdateSwitchButtonText(false);
+        Client.OnDisconnected += () => UpdateSwitchButtonText(true);
+        OnLoadForm += ClientForm_OnLoadForm;
+        OnSaveForm += ClientForm_OnSaveForm;
     }
 
-    static string TestFilePath => "test";
-
-    string IpAddress => IpAddressBox.Text;
-
-    int Port
+    private void ClientForm_OnSaveForm(SsSerializer serializer)
     {
-        get
-        {
-
-            _ = int.TryParse(PortBox.Text, out var port);
-            return port;
-        }
+        serializer.WriteTag(nameof(HostAddress), HostAddress.Text);
+        serializer.WriteTag(nameof(HostPort), HostPort.Value.ToString());
+        serializer.WriteTag(nameof(UserName), UserName.Text);
+        serializer.WriteTag(nameof(Password), Password.Text);
+        serializer.WriteTag(nameof(DirName), DirName.Text);
+        serializer.WriteTag(nameof(FilePath), FilePath.Text);
     }
 
-    private void UploadButton_Click(object? sender, EventArgs e)
+    private void ClientForm_OnLoadForm(SsDeserializer deserializer)
     {
-        //Client.Connect(IpAddress, port);
-        //Client.Login(IpAddress, Port, "admin", "password");
-        Client.Upload(Client.UserInfo?.Name ?? "default", TestFilePath, true);
+        HostAddress.Text = deserializer.ReadTag(nameof(HostAddress));
+        HostPort.Value = deserializer.ReadTag(nameof(HostPort), int.Parse);
+        UserName.Text = deserializer.ReadTag(nameof(UserName));
+        Password.Text = deserializer.ReadTag(nameof(Password));
+        DirName.Text = deserializer.ReadTag(nameof(DirName));
+        FilePath.Text = deserializer.ReadTag(nameof(FilePath));
     }
 
-    private void DownloadButton_Click(object? sender, EventArgs e)
+    private void FilePathButton_Click(object? sender, EventArgs e)
     {
-
-        var ipAddress = IpAddressBox.Text;
-        _ = int.TryParse(PortBox.Text, out var port);
-        //Client.Connect(ipAddress, port);
-        //Client.Login(IpAddress, Port, "admin", "password");
-        Client.Download(Client.UserInfo?.Name ?? "default", TestFilePath, true);
+        var file = new OpenFileDialog();
+        if (file.ShowDialog() is DialogResult.Cancel)
+            return;
+        FilePath.Text = file.FileName;
     }
 
-    private string GetUploadPath(string localPath)
+    private void SwitchButton_Click(object? sender, EventArgs e)
     {
-        return Path.Combine(RootDirectory, "upload", localPath);
+        if (Client.IsConnect)
+            Client.Disconnect();
+        else
+            Client.Connect(HostAddress.Text, (int)HostPort.Value, UserName.Text, Password.Text);
     }
 
-    private string GetDownloadPath(string localPath)
+    private void UpdateSwitchButtonText(bool connect)
     {
-        return Path.Combine(RootDirectory, "download", localPath);
-    }
-
-    private void SingleButton_Click(object? sender, EventArgs e)
-    {
-        Test();
-    }
-
-    private void Login(object? sender, EventArgs e)
-    {
-        Client.Login(IpAddress, Port, "admin", "password");
-    }
-
-    private void Test()
-    {
-        //var IpAddress = IpAddressBox.Text;
-        //_ = int.Parse(PortBox.Text, out var port);
-        //ClientOperator c1, c2, c3;
-        ////
-        //c1 = new("c1");
-        //c1.OnUpdateMessage += UpdateMessage;
-        //c1.Connect(IpAddress, port);
-        ////
-        ////Thread.Sleep(1000);
-        ////
-        //c2 = new("c2");
-        //c2.OnUpdateMessage += UpdateMessage;
-        //c2.Connect(IpAddress, port);
-        ////
-        ////Thread.Sleep(1000);
-        ////
-        //c2.Disconnet();
-        //c1.Disconnet();
-        //c3 = new("c3");
-        //c3.OnUpdateMessage += UpdateMessage;
-        ////c3.Connect(IpAddress, port);
-        ////
-        //Thread.Sleep(10);
-        ////
-        //c2.Connect(IpAddress, port);
-        //c1.Connect(IpAddress, port);
-        //c1.SendMessage("c1;Hello World;");
-        //c1.UploadFile(TestFilePath);
-        ////
-        //Thread.Sleep(100);
-        ////
-        //c2.SendMessage("c2;Hello Host;");
-        //var uploadedPath = Path.Combine("upload", TestFilePath);
-        //var downloadedPath = Path.Combine("download", uploadedPath);
-        //if (File.Exists(downloadedPath))
-        //{
-        //    try
-        //    {
-        //        File.Delete(downloadedPath);
-        //    }
-        //    catch { }
-        //}
-        //c3.DownloadFile(uploadedPath);
-        ////
-        ////Thread.Sleep(10000);
-        ////c3.SendMessage("file down");
-        ////c3.Disconnet();
-        ////c1.Disconnet();
-    }
-
-    string RootDirectory { get; } = Directory.CreateDirectory(nameof(ClientTestBoostForm)).FullName;
-
-    private void UpdateMessage(string message)
-    {
-        lock (MessageBox)
+        lock (SwitchButton)
         {
             Invoke(new Action(() =>
             {
-                MessageBox.Text += $"{message}\n";
+                SwitchButton.Text = connect ? "Connect" : "Disconnect";
                 Update();
             }));
         }
     }
 
-    private void DrawClient()
+    private void UpdateMessage(string message)
     {
-        var width = ClientWidth / 5;
+        lock (MessageBox)
+        {
+            Invoke(() =>
+            {
+                MessageBox.Text += $"{message}\n";
+                Update();
+            });
+        }
+    }
+
+    private void ClientForm_OnDrawClient()
+    {
+        var width = (ClientWidth - Padding * 7) / 5;
         var top = ClientTop + Padding;
         //
-        IpAddressBox.Left = ClientLeft + width;
-        IpAddressBox.Top = top;
-        IpAddressBox.Width = width;
+        HostAddress.Left = ClientLeft + Padding;
+        HostAddress.Top = top;
+        HostAddress.Width = width;
         //
-        PortBox.Left = IpAddressBox.Right + width;
-        PortBox.Top = top;
-        PortBox.Width = width;
+        HostPort.Left = HostAddress.Right + Padding;
+        HostPort.Top = top;
+        HostPort.Width = width;
         //
-        width = ClientWidth / 9;
-        top = PortBox.Bottom + Padding;
-        SingleButton.Left = ClientLeft + width;
-        SingleButton.Top = top;
-        SingleButton.Width = width;
+        UserName.Left = HostPort.Right + Padding;
+        UserName.Top = top;
+        UserName.Width = width;
         //
-        LoginButton.Left = SingleButton.Right + width;
-        LoginButton.Top = top;
-        LoginButton.Width = width;
+        Password.Left = UserName.Right + Padding;
+        Password.Top = top;
+        Password.Width = width;
         //
-        UploadButton.Left = LoginButton.Right + width;
-        UploadButton.Top = top;
-        UploadButton.Width = width;
+        SwitchButton.Left = Password.Right + Padding;
+        SwitchButton.Top = top;
+        SwitchButton.Width = width;
         //
-        DownloadButton.Left = UploadButton.Right + width;
-        DownloadButton.Top = top;
-        DownloadButton.Width = width;
+        top = Password.Bottom + Padding;
         //
         MessageBox.Left = ClientLeft + Padding;
-        MessageBox.Top = DownloadButton.Bottom + Padding;
+        MessageBox.Top = top;
         MessageBox.Width = ClientWidth - Padding * 2;
-        MessageBox.Height = ClientHeight - LoginButton.Height * 2 - Padding * 4;
+        MessageBox.Height = ClientHeight - HostAddress.Height - SendBox.Height - FilePath.Height - Padding * 6;
+        //
+        width = (ClientWidth - Padding * 3) / 4;
+        //
+        SendBox.Left = ClientLeft + Padding;
+        SendBox.Top = MessageBox.Bottom + Padding;
+        SendBox.Width = width * 3;
+        //
+        SendButton.Left = SendBox.Right + Padding;
+        SendButton.Top = MessageBox.Bottom + Padding;
+        SendButton.Width = width;
+        //
+        width = (ClientWidth - Padding * 10) / 12;
+        var width2x = width * 3;
+        top = SendButton.Bottom + Padding;
+        //
+        DirName.Left = ClientLeft + Padding;
+        DirName.Top = top;
+        DirName.Width = width2x;
+        //
+        FilePath.Left = DirName.Right + Padding;
+        FilePath.Top = top;
+        FilePath.Width = width2x + Padding;
+        //
+        FilePathButton.Left = FilePath.Right + Padding;
+        FilePathButton.Top = top;
+        FilePathButton.Width = width;
+        //
+        UploadButton.Left = FilePathButton.Right + Padding;
+        UploadButton.Top = top;
+        UploadButton.Width = width2x;
+        //
+        DownloadButton.Left = UploadButton.Right + Padding;
+        DownloadButton.Top = top;
+        DownloadButton.Width = width2x;
     }
 }
