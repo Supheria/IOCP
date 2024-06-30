@@ -1,10 +1,8 @@
-using LocalUtilities.IocpNet.Common;
 using LocalUtilities.IocpNet.Serve;
 using LocalUtilities.SimpleScript.Serialization;
 using LocalUtilities.TypeGeneral;
 using System;
-using System.Windows.Forms;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
+using System.Diagnostics;
 
 namespace WarringStates.UI;
 
@@ -71,7 +69,7 @@ public class ClientForm : ResizeableForm
 
     public ClientForm()
     {
-        Text = "client";
+        Text = "Client";
         Controls.AddRange([
             HostAddress,
             HostPort,
@@ -104,7 +102,7 @@ public class ClientForm : ResizeableForm
 
     private void Client_OnDisconnected()
     {
-        BeginInvoke(new Action(() =>
+        InvokeAsync(() =>
         {
             SwitchButton.Text = "Connect";
             HostAddress.Enabled = true;
@@ -112,12 +110,12 @@ public class ClientForm : ResizeableForm
             UserName.Enabled = true;
             Password.Enabled = true;
             Update();
-        }));
+        });
     }
 
     private void Client_OnConnected()
     {
-        BeginInvoke(new Action(() =>
+        InvokeAsync(() =>
         {
             SwitchButton.Text = "Disconnect";
             HostAddress.Enabled = false;
@@ -125,7 +123,7 @@ public class ClientForm : ResizeableForm
             UserName.Enabled = false;
             Password.Enabled = false;
             Update();
-        }));
+        });
     }
 
     private void ClientForm_OnSaveForm(SsSerializer serializer)
@@ -159,14 +157,14 @@ public class ClientForm : ResizeableForm
     private void SwitchButton_Click(object? sender, EventArgs e)
     {
         if (Client.IsConnect)
-            Client.Disconnected();
+            Client.Disconnect();
         else
             Client.Connect(HostAddress.Text, (int)HostPort.Value, UserName.Text, Password.Text);
     }
 
     private void UpdateMessage(string message)
     {
-        BeginInvoke(() =>
+        InvokeAsync(() =>
         {
             MessageBox.Text += $"{message}\n";
             Update();
@@ -175,7 +173,7 @@ public class ClientForm : ResizeableForm
 
     private void UpdateFormText(string text)
     {
-        BeginInvoke(() =>
+        InvokeAsync(() =>
         {
             Text = $"client - {text}";
             Update();

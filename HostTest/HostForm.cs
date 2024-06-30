@@ -1,7 +1,5 @@
-using LocalUtilities.IocpNet.Protocol;
 using LocalUtilities.IocpNet.Serve;
 using LocalUtilities.TypeGeneral;
-using System.Windows.Forms;
 
 namespace WarringStates.UI;
 
@@ -9,7 +7,7 @@ internal class HostForm : ResizeableForm
 {
     public override string LocalName => nameof(HostForm);
 
-    IocpHost Host { get; set; } = new(1000);
+    IocpHost Host { get; set; } = new();
 
     NumericUpDown Port { get; } = new()
     {
@@ -18,8 +16,7 @@ internal class HostForm : ResizeableForm
 
     Button SwitchButton { get; } = new()
     {
-        //Text = "Start"
-        Text = "Stop"
+        Text = "Start"
     };
 
     Label ParallelCount { get; } = new()
@@ -39,7 +36,7 @@ internal class HostForm : ResizeableForm
 
     public HostForm()
     {
-        Text = "tcp server";
+        Text = "Host";
         Controls.AddRange([
             Port,
             SwitchButton,
@@ -51,39 +48,33 @@ internal class HostForm : ResizeableForm
         OnDrawClient += DrawClient;
         SwitchButton.Click += SwitchButton_Click;
         Host.OnLog += UpdateMessage;
-        Host.OnParallelRemainChange += Host_OnParallelRemainChange;Host.Start((int)Port.Value);
-        Host.Start((int)Port.Value);
+        Host.OnConnectionCountChange += Host_OnParallelRemainChange;
+        //Host.Start((int)Port.Value);
     }
 
     private void Host_OnParallelRemainChange(int args)
     {
-        lock (ParallelCount)
+        InvokeAsync(() =>
         {
-            Invoke(() =>
-            {
-                ParallelCount.Text = args.ToString();
-                Update();
-            });
-        }
+            ParallelCount.Text = args.ToString();
+            Update();
+        });
     }
 
     private void UpdateMessage(string message)
     {
-        lock (MessageBox)
+        InvokeAsync(new Action(() =>
         {
-            Invoke(new Action(() =>
-            {
-                MessageBox.Text += $"{message}\n";
-                Update();
-            }));
-        }
+            MessageBox.Text += $"{message}\n";
+            Update();
+        }));
     }
 
     private void SwitchButton_Click(object? sender, EventArgs e)
     {
         if (Host.IsStart)
         {
-            Host.Stop();
+            Host.Close();
             if (!Host.IsStart)
                 SwitchButton.Text = "Start";
             else
