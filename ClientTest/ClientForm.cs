@@ -2,6 +2,8 @@ using LocalUtilities.IocpNet.Common;
 using LocalUtilities.IocpNet.Serve;
 using LocalUtilities.SimpleScript.Serialization;
 using LocalUtilities.TypeGeneral;
+using System;
+using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
 
 namespace WarringStates.UI;
@@ -9,6 +11,8 @@ namespace WarringStates.UI;
 public class ClientForm : ResizeableForm
 {
     public override string LocalName => nameof(ClientForm);
+
+    private object FormLocker { get; } = new();
 
     IocpClient Client { get; } = new();
 
@@ -83,6 +87,9 @@ public class ClientForm : ResizeableForm
             UploadButton,
             DownloadButton,
             ]);
+        OnLoadForm += ClientForm_OnLoadForm;
+        OnSaveForm += ClientForm_OnSaveForm;
+        FormClosing += (_, _) => Client.Close();
         OnDrawClient += ClientForm_OnDrawClient;
         SwitchButton.Click += SwitchButton_Click;
         SendButton.Click += (_, _) => Client.SendMessage(SendBox.Text);
@@ -92,27 +99,33 @@ public class ClientForm : ResizeableForm
         Client.OnLog += UpdateMessage;
         Client.OnConnected += Client_OnConnected;
         Client.OnDisconnected += Client_OnDisconnected;
-        OnLoadForm += ClientForm_OnLoadForm;
-        OnSaveForm += ClientForm_OnSaveForm;
-        FormClosing += (_, _) => Client.Disconnected();
+        Client.OnProcessing += UpdateFormText;
     }
 
     private void Client_OnDisconnected()
     {
-        UpdateSwitchButtonText(true);
-        HostAddress.Enabled = true;
-        HostPort.Enabled = true;
-        UserName.Enabled = true;
-        Password.Enabled = true;
+        BeginInvoke(new Action(() =>
+        {
+            SwitchButton.Text = "Connect";
+            HostAddress.Enabled = true;
+            HostPort.Enabled = true;
+            UserName.Enabled = true;
+            Password.Enabled = true;
+            Update();
+        }));
     }
 
     private void Client_OnConnected()
     {
-        UpdateSwitchButtonText(false);
-        HostAddress.Enabled = false;
-        HostPort.Enabled = false;
-        UserName.Enabled = false;
-        Password.Enabled = false;
+        BeginInvoke(new Action(() =>
+        {
+            SwitchButton.Text = "Disconnect";
+            HostAddress.Enabled = false;
+            HostPort.Enabled = false;
+            UserName.Enabled = false;
+            Password.Enabled = false;
+            Update();
+        }));
     }
 
     private void ClientForm_OnSaveForm(SsSerializer serializer)
@@ -151,28 +164,22 @@ public class ClientForm : ResizeableForm
             Client.Connect(HostAddress.Text, (int)HostPort.Value, UserName.Text, Password.Text);
     }
 
-    private void UpdateSwitchButtonText(bool connect)
-    {
-        lock (SwitchButton)
-        {
-            Invoke(new Action(() =>
-            {
-                SwitchButton.Text = connect ? "Connect" : "Disconnect";
-                Update();
-            }));
-        }
-    }
-
     private void UpdateMessage(string message)
     {
-        lock (MessageBox)
+        BeginInvoke(() =>
         {
-            Invoke(() =>
-            {
-                MessageBox.Text += $"{message}\n";
-                Update();
-            });
-        }
+            MessageBox.Text += $"{message}\n";
+            Update();
+        });
+    }
+
+    private void UpdateFormText(string text)
+    {
+        BeginInvoke(() =>
+        {
+            Text = $"client - {text}";
+            Update();
+        });
     }
 
     private void ClientForm_OnDrawClient()
