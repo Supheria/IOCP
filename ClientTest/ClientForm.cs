@@ -1,3 +1,4 @@
+using LocalUtilities.IocpNet.Common;
 using LocalUtilities.IocpNet.Serve;
 using LocalUtilities.SimpleScript.Serialization;
 using LocalUtilities.TypeGeneral;
@@ -89,11 +90,29 @@ public class ClientForm : ResizeableForm
         UploadButton.Click += (_, _) => Client.Upload(DirName.Text, FilePath.Text);
         DownloadButton.Click += (_, _) => Client.Download(DirName.Text, FilePath.Text);
         Client.OnLog += UpdateMessage;
-        Client.OnConnected += () => UpdateSwitchButtonText(false);
-        Client.OnDisconnected += () => UpdateSwitchButtonText(true);
+        Client.OnConnected += Client_OnConnected;
+        Client.OnDisconnected += Client_OnDisconnected;
         OnLoadForm += ClientForm_OnLoadForm;
         OnSaveForm += ClientForm_OnSaveForm;
-        FormClosing += (_, _) => Client.Disconnect();
+        FormClosing += (_, _) => Client.Disconnected();
+    }
+
+    private void Client_OnDisconnected()
+    {
+        UpdateSwitchButtonText(true);
+        HostAddress.Enabled = true;
+        HostPort.Enabled = true;
+        UserName.Enabled = true;
+        Password.Enabled = true;
+    }
+
+    private void Client_OnConnected()
+    {
+        UpdateSwitchButtonText(false);
+        HostAddress.Enabled = false;
+        HostPort.Enabled = false;
+        UserName.Enabled = false;
+        Password.Enabled = false;
     }
 
     private void ClientForm_OnSaveForm(SsSerializer serializer)
@@ -127,7 +146,7 @@ public class ClientForm : ResizeableForm
     private void SwitchButton_Click(object? sender, EventArgs e)
     {
         if (Client.IsConnect)
-            Client.Disconnect();
+            Client.Disconnected();
         else
             Client.Connect(HostAddress.Text, (int)HostPort.Value, UserName.Text, Password.Text);
     }
