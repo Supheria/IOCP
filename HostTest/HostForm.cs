@@ -47,9 +47,15 @@ internal class HostForm : ResizeableForm
             ]);
         OnDrawClient += DrawClient;
         SwitchButton.Click += SwitchButton_Click;
+        SendButton.Click += SendButton_Click;
         Host.OnLog += UpdateMessage;
         Host.OnConnectionCountChange += Host_OnParallelRemainChange;
         //Host.Start((int)Port.Value);
+    }
+
+    private void SendButton_Click(object? sender, EventArgs e)
+    {
+        Host.BroadcastMessage(SendBox.Text);
     }
 
     private void Host_OnParallelRemainChange(int args)

@@ -92,8 +92,8 @@ public class ClientForm : ResizeableForm
         SwitchButton.Click += SwitchButton_Click;
         SendButton.Click += (_, _) => Client.SendMessage(SendBox.Text);
         FilePathButton.Click += FilePathButton_Click;
-        UploadButton.Click += (_, _) => Client.Upload(DirName.Text, FilePath.Text);
-        DownloadButton.Click += (_, _) => Client.Download(DirName.Text, FilePath.Text);
+        UploadButton.Click += (_, _) => Client.UploadFile(DirName.Text, FilePath.Text);
+        DownloadButton.Click += (_, _) => Client.DownloadFile(DirName.Text, FilePath.Text);
         Client.OnLog += UpdateMessage;
         Client.OnConnected += Client_OnConnected;
         Client.OnDisconnected += Client_OnDisconnected;
