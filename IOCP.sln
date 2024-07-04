@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LocalUtilities", "_lib\Loca
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ClientTest", "ClientTest\ClientTest.csproj", "{05B1787D-639F-41AF-92EB-0870ACBAD2B1}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HostTest", "HostTest\HostTest.csproj", "{7C5D0AED-63AB-49FC-8ED4-74A9D6CDD9A6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServerTest", "ServerTest\ServerTest.csproj", "{7F271C48-0341-4550-851F-614425AB1784}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,10 +23,10 @@ Global
 		{05B1787D-639F-41AF-92EB-0870ACBAD2B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{05B1787D-639F-41AF-92EB-0870ACBAD2B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{05B1787D-639F-41AF-92EB-0870ACBAD2B1}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7C5D0AED-63AB-49FC-8ED4-74A9D6CDD9A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7C5D0AED-63AB-49FC-8ED4-74A9D6CDD9A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7C5D0AED-63AB-49FC-8ED4-74A9D6CDD9A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7C5D0AED-63AB-49FC-8ED4-74A9D6CDD9A6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F271C48-0341-4550-851F-614425AB1784}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F271C48-0341-4550-851F-614425AB1784}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F271C48-0341-4550-851F-614425AB1784}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F271C48-0341-4550-851F-614425AB1784}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

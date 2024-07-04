@@ -3,11 +3,11 @@ using LocalUtilities.TypeGeneral;
 
 namespace WarringStates.UI;
 
-internal class HostForm : ResizeableForm
+internal class ServerForm : ResizeableForm
 {
-    public override string LocalName => nameof(HostForm);
+    public override string LocalName => nameof(ServerForm);
 
-    IocpHost Host { get; set; } = new();
+    Server Host { get; set; } = new();
 
     NumericUpDown Port { get; } = new()
     {
@@ -34,9 +34,9 @@ internal class HostForm : ResizeableForm
         Text = "Send",
     };
 
-    public HostForm()
+    public ServerForm()
     {
-        Text = "Host";
+        Text = "Server";
         Controls.AddRange([
             Port,
             SwitchButton,

@@ -12,7 +12,7 @@ public class ClientForm : ResizeableForm
 
     private object FormLocker { get; } = new();
 
-    IocpClient Client { get; } = new();
+    ClientHost Client { get; } = new();
 
     TextBox HostAddress { get; } = new()
     {
