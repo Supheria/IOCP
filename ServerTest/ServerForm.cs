@@ -27,7 +27,10 @@ internal class ServerForm : ResizeableForm
 
     RichTextBox MessageBox { get; } = new();
 
-    TextBox SendBox { get; } = new();
+    TextBox SendBox { get; } = new()
+    {
+        Multiline = true,
+    };
 
     Button SendButton { get; } = new()
     {
@@ -60,7 +63,7 @@ internal class ServerForm : ResizeableForm
 
     private void Host_OnParallelRemainChange(int args)
     {
-        InvokeAsync(() =>
+        BeginInvoke(() =>
         {
             ParallelCount.Text = args.ToString();
             Update();
@@ -69,7 +72,7 @@ internal class ServerForm : ResizeableForm
 
     private void UpdateMessage(string message)
     {
-        InvokeAsync(new Action(() =>
+        BeginInvoke(new Action(() =>
         {
             MessageBox.Text += $"{message}\n";
             Update();

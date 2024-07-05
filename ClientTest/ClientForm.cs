@@ -41,7 +41,10 @@ public class ClientForm : ResizeableForm
 
     RichTextBox MessageBox { get; } = new();
 
-    TextBox SendBox { get; } = new();
+    TextBox SendBox { get; } = new()
+    {
+        Multiline = true,
+    };
 
     Button SendButton { get; } = new()
     {
@@ -102,7 +105,7 @@ public class ClientForm : ResizeableForm
 
     private void Client_OnDisconnected()
     {
-        InvokeAsync(() =>
+        BeginInvoke(() =>
         {
             SwitchButton.Text = "Connect";
             HostAddress.Enabled = true;
@@ -115,7 +118,7 @@ public class ClientForm : ResizeableForm
 
     private void Client_OnConnected()
     {
-        InvokeAsync(() =>
+        BeginInvoke(() =>
         {
             SwitchButton.Text = "Disconnect";
             HostAddress.Enabled = false;
@@ -164,7 +167,7 @@ public class ClientForm : ResizeableForm
 
     private void UpdateMessage(string message)
     {
-        InvokeAsync(() =>
+        BeginInvoke(() =>
         {
             MessageBox.Text += $"{message}\n";
             Update();
@@ -173,7 +176,7 @@ public class ClientForm : ResizeableForm
 
     private void UpdateFormText(string text)
     {
-        InvokeAsync(() =>
+        BeginInvoke(() =>
         {
             Text = $"client - {text}";
             Update();
