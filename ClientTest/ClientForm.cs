@@ -70,6 +70,8 @@ public class ClientForm : ResizeableForm
         Text = "Download"
     };
 
+    ListBox UserList { get; } = new();
+
     public ClientForm()
     {
         Text = "Client";
@@ -80,6 +82,7 @@ public class ClientForm : ResizeableForm
             Password,
             SwitchButton,
             MessageBox,
+            UserList,
             SendBox,
             SendButton,
             DirName,
@@ -101,6 +104,17 @@ public class ClientForm : ResizeableForm
         Client.OnConnected += Client_OnConnected;
         Client.OnDisconnected += Client_OnDisconnected;
         Client.OnProcessing += UpdateFormText;
+        Client.OnUpdateUserList += Client_OnUpdateUserList;
+    }
+
+    private void Client_OnUpdateUserList(string[] userList)
+    {
+        BeginInvoke(() =>
+        {
+            UserList.Items.Clear();
+            UserList.Items.AddRange(userList);
+            Update();
+        });
     }
 
     private void Client_OnDisconnected()
@@ -160,7 +174,7 @@ public class ClientForm : ResizeableForm
     private void SwitchButton_Click(object? sender, EventArgs e)
     {
         if (Client.IsConnect)
-            Client.Disconnect();
+            Client.Close();
         else
             Client.Connect(HostAddress.Text, (int)HostPort.Value, UserName.Text, Password.Text);
     }
@@ -208,12 +222,19 @@ public class ClientForm : ResizeableForm
         SwitchButton.Top = top;
         SwitchButton.Width = width;
         //
+        width = (ClientWidth - Padding * 3) / 4;
         top = Password.Bottom + Padding;
+        var height = ClientHeight - HostAddress.Height - SendBox.Height - FilePath.Height - Padding * 6;
         //
         MessageBox.Left = ClientLeft + Padding;
         MessageBox.Top = top;
-        MessageBox.Width = ClientWidth - Padding * 2;
-        MessageBox.Height = ClientHeight - HostAddress.Height - SendBox.Height - FilePath.Height - Padding * 6;
+        MessageBox.Width = width * 3;
+        MessageBox.Height = height;
+        //
+        UserList.Left = MessageBox.Right + Padding;
+        UserList.Top = top;
+        UserList.Width = width;
+        UserList.Height = height;
         //
         width = (ClientWidth - Padding * 3) / 4;
         //
