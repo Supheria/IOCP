@@ -1,3 +1,4 @@
+using LocalUtilities.IocpNet.Common;
 using LocalUtilities.IocpNet.Serve;
 using LocalUtilities.SimpleScript.Serialization;
 using LocalUtilities.TypeGeneral;
@@ -70,7 +71,10 @@ public class ClientForm : ResizeableForm
         Text = "Download"
     };
 
-    ListBox UserList { get; } = new();
+    ListBox UserList { get; } = new()
+    {
+        SelectionMode = SelectionMode.MultiExtended
+    };
 
     public ClientForm()
     {
@@ -96,7 +100,7 @@ public class ClientForm : ResizeableForm
         FormClosing += (_, _) => Client.Close();
         OnDrawClient += ClientForm_OnDrawClient;
         SwitchButton.Click += SwitchButton_Click;
-        SendButton.Click += (_, _) => Client.SendMessage(SendBox.Text);
+        SendButton.Click += SendButton_Click;
         FilePathButton.Click += FilePathButton_Click;
         UploadButton.Click += (_, _) => Client.UploadFile(DirName.Text, FilePath.Text);
         DownloadButton.Click += (_, _) => Client.DownloadFile(DirName.Text, FilePath.Text);
@@ -107,12 +111,28 @@ public class ClientForm : ResizeableForm
         Client.OnUpdateUserList += Client_OnUpdateUserList;
     }
 
+    private void SendButton_Click(object? sender, EventArgs e)
+    {
+        var index = UserList.SelectedIndex;
+        if (index is -1)
+        {
+            UpdateMessage("no selected user to send message");
+            return;
+        }
+        foreach (var item in UserList.SelectedItems)
+            Client.SendMessage(SendBox.Text, (string)item);
+    }
+
     private void Client_OnUpdateUserList(string[] userList)
     {
         BeginInvoke(() =>
         {
             UserList.Items.Clear();
-            UserList.Items.AddRange(userList);
+            foreach (var user in userList)
+            {
+                if (user != UserName.Text)
+                    UserList.Items.Add(user);
+            }
             Update();
         });
     }
